@@ -40,12 +40,6 @@ on:
         description: If true, upload the release wheel to PyPI after GitHub Release
         type: boolean
         default: false
-      pypi-environment:
-        description: >-
-          Optional GitHub Environment name for the PyPI job (Trusted Publishing /
-          protection rules). Empty = no environment.
-        type: string
-        default: ""
     secrets:
       PYPI_API_TOKEN:
         description: Optional PyPI API token (fallback when not using Trusted Publishing)
@@ -283,7 +277,6 @@ jobs:
       needs.semver.outputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: ${{ inputs.pypi-environment != '' && inputs.pypi-environment || fromJSON('null') }}
     permissions:
       contents: read
       id-token: write
