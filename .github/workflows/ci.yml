@@ -7,6 +7,10 @@
 # Note: GitHub forbids subdirectories under .github/workflows/ for reusable
 # workflows. Organize with short flat names (ci, python, node, semver-ci, semver-cd).
 # Composite actions MAY live under .github/actions/<name>/ (see detect-layout).
+#
+# Pre-merge (pull_request) vs post-merge (push / workflow_dispatch) knobs are
+# separate inputs — consumers should NOT inject event_name expressions themselves.
+# Empty event-specific strings fall back to the shared baseline inputs.
 
 name: ci
 
@@ -26,27 +30,75 @@ on:
         type: string
         default: "package.json"
       python-versions:
-        description: JSON array of Python versions
+        description: JSON array of Python versions (shared baseline)
         type: string
         default: '["3.11","3.12","3.13"]'
+      python-versions-pr:
+        description: Override python-versions on pull_request (empty = shared)
+        type: string
+        default: ""
+      python-versions-push:
+        description: Override python-versions on push/workflow_dispatch (empty = shared)
+        type: string
+        default: ""
       node-versions:
-        description: JSON array of Node versions
+        description: JSON array of Node versions (shared baseline)
         type: string
         default: '["20","22"]'
+      node-versions-pr:
+        description: Override node-versions on pull_request (empty = shared)
+        type: string
+        default: ""
+      node-versions-push:
+        description: Override node-versions on push/workflow_dispatch (empty = shared)
+        type: string
+        default: ""
       sync-args:
-        description: Extra args to uv sync
+        description: Extra args to uv sync (shared baseline)
         type: string
         default: "--group dev"
+      sync-args-pr:
+        description: Override sync-args on pull_request (empty = shared)
+        type: string
+        default: ""
+      sync-args-push:
+        description: Override sync-args on push/workflow_dispatch (empty = shared)
+        type: string
+        default: ""
       pytest-args:
-        description: Extra args to uv run pytest
+        description: Extra args to uv run pytest (shared baseline)
         type: string
         default: "-q"
+      pytest-args-pr:
+        description: Override pytest-args on pull_request (empty = shared)
+        type: string
+        default: ""
+      pytest-args-push:
+        description: Override pytest-args on push/workflow_dispatch (empty = shared)
+        type: string
+        default: ""
       disable-python:
-        description: If true, never run the Python lane
+        description: If true, never run the Python lane (any event)
         type: boolean
         default: false
       disable-node:
-        description: If true, never run the Node lane
+        description: If true, never run the Node lane (any event)
+        type: boolean
+        default: false
+      skip-python-pr:
+        description: Skip Python lane on pull_request only
+        type: boolean
+        default: false
+      skip-python-push:
+        description: Skip Python lane on push/workflow_dispatch only
+        type: boolean
+        default: false
+      skip-node-pr:
+        description: Skip Node lane on pull_request only
+        type: boolean
+        default: false
+      skip-node-push:
+        description: Skip Node lane on push/workflow_dispatch only
         type: boolean
         default: false
       allow-empty:
@@ -66,11 +118,15 @@ jobs:
       run_python: ${{ steps.layout.outputs.run_python }}
       run_node: ${{ steps.layout.outputs.run_node }}
       working_directory: ${{ steps.layout.outputs.working_directory }}
+      python_versions: ${{ steps.layout.outputs.python_versions }}
+      node_versions: ${{ steps.layout.outputs.node_versions }}
+      sync_args: ${{ steps.layout.outputs.sync_args }}
+      pytest_args: ${{ steps.layout.outputs.pytest_args }}
     steps:
       - uses: actions/checkout@v7
       # Inline detect (not ./.github/actions/…): relative action paths resolve to the
       # *caller* repo when this workflow is used via workflow_call.
-      - name: Detect layout
+      - name: Detect layout + resolve event knobs
         id: layout
         env:
           WORKING_DIRECTORY: ${{ inputs.working-directory || '.' }}
@@ -78,6 +134,23 @@ jobs:
           PACKAGE_JSON_PATH: ${{ inputs.package-json-path || 'package.json' }}
           DISABLE_PYTHON: ${{ inputs.disable-python == true && 'true' || 'false' }}
           DISABLE_NODE: ${{ inputs.disable-node == true && 'true' || 'false' }}
+          EVENT_NAME: ${{ github.event_name }}
+          PYTHON_VERSIONS: ${{ inputs.python-versions || '["3.11","3.12","3.13"]' }}
+          PYTHON_VERSIONS_PR: ${{ inputs.python-versions-pr }}
+          PYTHON_VERSIONS_PUSH: ${{ inputs.python-versions-push }}
+          NODE_VERSIONS: ${{ inputs.node-versions || '["20","22"]' }}
+          NODE_VERSIONS_PR: ${{ inputs.node-versions-pr }}
+          NODE_VERSIONS_PUSH: ${{ inputs.node-versions-push }}
+          SYNC_ARGS: ${{ inputs.sync-args || '--group dev' }}
+          SYNC_ARGS_PR: ${{ inputs.sync-args-pr }}
+          SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
+          PYTEST_ARGS: ${{ inputs.pytest-args || '-q' }}
+          PYTEST_ARGS_PR: ${{ inputs.pytest-args-pr }}
+          PYTEST_ARGS_PUSH: ${{ inputs.pytest-args-push }}
+          SKIP_PYTHON_PR: ${{ inputs.skip-python-pr == true && 'true' || 'false' }}
+          SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
+          SKIP_NODE_PR: ${{ inputs.skip-node-pr == true && 'true' || 'false' }}
+          SKIP_NODE_PUSH: ${{ inputs.skip-node-push == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
           root="${WORKING_DIRECTORY:-.}"
@@ -88,19 +161,65 @@ jobs:
           package_json="${root%/}/${PACKAGE_JSON_PATH}"
           package_json="${package_json#./}"
 
+          # pull_request = pre-merge; push + workflow_dispatch = post-merge knobs
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            event_kind=pr
+          else
+            event_kind=push
+          fi
+
+          pick() {
+            # pick <shared> <pr_override> <push_override>
+            local shared="$1" pr="$2" push="$3"
+            if [[ "${event_kind}" == "pr" ]]; then
+              if [[ -n "${pr}" ]]; then echo "${pr}"; else echo "${shared}"; fi
+            else
+              if [[ -n "${push}" ]]; then echo "${push}"; else echo "${shared}"; fi
+            fi
+          }
+
+          python_versions="$(pick "${PYTHON_VERSIONS}" "${PYTHON_VERSIONS_PR}" "${PYTHON_VERSIONS_PUSH}")"
+          node_versions="$(pick "${NODE_VERSIONS}" "${NODE_VERSIONS_PR}" "${NODE_VERSIONS_PUSH}")"
+          sync_args="$(pick "${SYNC_ARGS}" "${SYNC_ARGS_PR}" "${SYNC_ARGS_PUSH}")"
+          pytest_args="$(pick "${PYTEST_ARGS}" "${PYTEST_ARGS_PR}" "${PYTEST_ARGS_PUSH}")"
+
+          if [[ "${event_kind}" == "pr" ]]; then
+            skip_python="${SKIP_PYTHON_PR}"
+            skip_node="${SKIP_NODE_PR}"
+          else
+            skip_python="${SKIP_PYTHON_PUSH}"
+            skip_node="${SKIP_NODE_PUSH}"
+          fi
+
           run_python=false
-          if [[ "${DISABLE_PYTHON}" != "true" && -f "${pyproject}" ]]; then
+          if [[ "${DISABLE_PYTHON}" != "true" && "${skip_python}" != "true" && -f "${pyproject}" ]]; then
             run_python=true
           fi
           run_node=false
-          if [[ "${DISABLE_NODE}" != "true" && -f "${package_json}" ]]; then
+          if [[ "${DISABLE_NODE}" != "true" && "${skip_node}" != "true" && -f "${package_json}" ]]; then
             run_node=true
           fi
 
-          echo "working_directory=${root}" >> "$GITHUB_OUTPUT"
-          echo "run_python=${run_python}" >> "$GITHUB_OUTPUT"
-          echo "run_node=${run_node}" >> "$GITHUB_OUTPUT"
-          echo "detect: root=${root} pyproject=${pyproject} package_json=${package_json} run_python=${run_python} run_node=${run_node}"
+          {
+            echo "working_directory=${root}"
+            echo "run_python=${run_python}"
+            echo "run_node=${run_node}"
+            echo "python_versions=${python_versions}"
+            echo "node_versions=${node_versions}"
+            # Delimiter form so args may contain spaces / equals.
+            echo "sync_args<<EOF_SYNC"
+            echo "${sync_args}"
+            echo "EOF_SYNC"
+            echo "pytest_args<<EOF_PYTEST"
+            echo "${pytest_args}"
+            echo "EOF_PYTEST"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "detect: event=${EVENT_NAME} kind=${event_kind} root=${root}"
+          echo "detect: pyproject=${pyproject} package_json=${package_json}"
+          echo "detect: run_python=${run_python} run_node=${run_node} skip_python=${skip_python} skip_node=${skip_node}"
+          echo "detect: python_versions=${python_versions} node_versions=${node_versions}"
+          echo "detect: sync_args=${sync_args} pytest_args=${pytest_args}"
 
   python:
     name: Python
@@ -109,9 +228,9 @@ jobs:
     uses: ./.github/workflows/python.yml
     with:
       working-directory: ${{ needs.detect.outputs.working_directory }}
-      python-versions: ${{ inputs.python-versions || '["3.11","3.12","3.13"]' }}
-      sync-args: ${{ inputs.sync-args || '--group dev' }}
-      pytest-args: ${{ inputs.pytest-args || '-q' }}
+      python-versions: ${{ needs.detect.outputs.python_versions }}
+      sync-args: ${{ needs.detect.outputs.sync_args }}
+      pytest-args: ${{ needs.detect.outputs.pytest_args }}
 
   node:
     name: Node
@@ -120,7 +239,7 @@ jobs:
     uses: ./.github/workflows/node.yml
     with:
       working-directory: ${{ needs.detect.outputs.working_directory }}
-      node-versions: ${{ inputs.node-versions || '["20","22"]' }}
+      node-versions: ${{ needs.detect.outputs.node_versions }}
 
   # Leaf name "CI" → consumer job named CI reports check "CI / CI".
   # !cancelled(): skip gate when concurrency cancels an in-flight run (avoids a

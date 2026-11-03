@@ -11,11 +11,12 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 
 ## Why this repo?
 
-- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`
+- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`
 - **Auto lanes** — Python (`pyproject.toml`) and/or Node (`package.json`)
+- **Pre/post-merge CI knobs** — separate `*-pr` / `*-push` inputs (no consumer `event_name` expressions)
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
-- **Floating `@v1`** — CD moves the major tag to each new release of that major
+- **Floating `@v1` and `@latest`** — CD retags both; prefer `@v1` for the stable major contract
 - **Opt-in PyPI** — same release wheel via API token (OIDC later from thin CD)
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 

@@ -1,0 +1,123 @@
+# Force-move floating git tags to a SHA.
+#   uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+#
+# Caller needs permissions: contents: write
+# Typical tags: latest, vMAJOR (via move-major), or custom names.
+
+name: retag
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit SHA that floating tags should point at
+        type: string
+        required: true
+      tags:
+        description: JSON array of tag names to force-move (e.g. '["latest"]')
+        type: string
+        default: '["latest"]'
+      move-major:
+        description: If true, also derive vMAJOR from release-tag and move it
+        type: boolean
+        default: true
+      release-tag:
+        description: Semver release tag (e.g. v1.2.3); required when move-major is true
+        type: string
+        default: ""
+      dry-run:
+        description: Print planned moves without tagging or pushing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  retag:
+    name: Retag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Force-move floating tags
+        env:
+          SHA: ${{ inputs.sha }}
+          TAGS_JSON: ${{ inputs.tags || '["latest"]' }}
+          MOVE_MAJOR: ${{ inputs.move-major == true && 'true' || 'false' }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          DRY_RUN: ${{ inputs.dry-run == true && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${SHA}" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "FAIL: sha must be a git commit SHA, got: ${SHA}"
+            exit 1
+          fi
+          if ! git cat-file -e "${SHA}^{commit}" 2>/dev/null; then
+            echo "FAIL: commit ${SHA} not found in this repository"
+            exit 1
+          fi
+
+          mapfile -t tags < <(python3 -c '
+          import json, sys
+          raw = sys.argv[1]
+          data = json.loads(raw)
+          if not isinstance(data, list):
+              raise SystemExit("tags must be a JSON array of strings")
+          for item in data:
+              if not isinstance(item, str) or not item.strip():
+                  raise SystemExit(f"invalid tag entry: {item!r}")
+              print(item.strip())
+          ' "${TAGS_JSON}")
+
+          if [[ "${MOVE_MAJOR}" == "true" ]]; then
+            if [[ -z "${RELEASE_TAG}" ]]; then
+              echo "FAIL: release-tag is required when move-major is true"
+              exit 1
+            fi
+            major="$(echo "${RELEASE_TAG}" | sed -E 's/^(v[0-9]+)\..*/\1/')"
+            if [[ ! "${major}" =~ ^v[0-9]+$ ]]; then
+              echo "FAIL: cannot derive vMAJOR from release-tag=${RELEASE_TAG}"
+              exit 1
+            fi
+            tags+=("${major}")
+          fi
+
+          # Deduplicate while preserving order
+          declare -A seen=()
+          unique=()
+          for t in "${tags[@]+"${tags[@]}"}"; do
+            if [[ -z "${seen[$t]+x}" ]]; then
+              seen[$t]=1
+              unique+=("$t")
+            fi
+          done
+
+          if [[ ${#unique[@]} -eq 0 ]]; then
+            echo "No tags to move (empty tags and move-major=false)."
+            exit 0
+          fi
+
+          echo "## Floating tag moves" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tag | SHA | Mode |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+
+          for t in "${unique[@]}"; do
+            mode="apply"
+            if [[ "${DRY_RUN}" == "true" ]]; then
+              mode="dry-run"
+              echo "dry-run: would move ${t} → ${SHA}"
+            else
+              git tag -f "${t}" "${SHA}"
+              git push origin "refs/tags/${t}" --force
+              echo "Moved floating tag ${t} → ${SHA}"
+            fi
+            echo "| \`${t}\` | \`${SHA}\` | ${mode} |" >> "$GITHUB_STEP_SUMMARY"
+          done

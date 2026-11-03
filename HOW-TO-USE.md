@@ -4,16 +4,25 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
+
+## Pins: `@v1` vs `@latest`
+
+| Pin | Meaning |
+| --- | ------- |
+| **`@v1`** | Floating major — stays on the latest release of major 1 (stable contract). **Prefer this.** |
+| **`@latest`** | Always the newest successful release SHA (any major). |
+
+Both are force-moved by CD after each release (`semver-cd` → `retag.yml`).
 
 ## Semver (one feature, two stages)
 
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
 | **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → move floating `vMAJOR` → optional PyPI |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → floating tags (`latest` + `vMAJOR`) → optional PyPI |
 
 ## Wire-up
 
@@ -30,7 +39,27 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+# optional standalone floating-tag mover:
+uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 ```
+
+### Pre-merge vs post-merge CI (no consumer expressions)
+
+Set event-specific inputs on the reusable `ci.yml` — do **not** write
+`python-versions: ${{ github.event_name == 'push' && '…' || '…' }}` in the thin orchestrator.
+
+```yaml
+jobs:
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    with:
+      python-versions: '["3.11","3.12","3.13"]'   # shared baseline (both events)
+      python-versions-push: '["3.11","3.13"]'      # optional lighter post-merge
+      skip-node-push: true                           # optional: skip Node on push only
+```
+
+Empty `*-pr` / `*-push` strings inherit the shared baseline. Defaults keep the **full matrix on both** PR and push. `workflow_dispatch` uses the push knobs. Global `disable-python` / `disable-node` still kill a lane for every event; `skip-*-pr` / `skip-*-push` only skip that event.
 
 ### Security settings (step 5)
 

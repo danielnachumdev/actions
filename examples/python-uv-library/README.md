@@ -4,7 +4,7 @@
 2. Copy [`templates/github/`](../../templates/github/) (CODEOWNERS + **dependabot.yml**)  
 3. Create labels **before** Dependabot runs: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
 4. Required checks: **`CI / CI`**, **`Semver / Semver`**  
-5. Pin `@v1`
+5. Pin `@v1` (stable major) — `@latest` also floats to each release
 
 Dependabot’s `labels:` (template: `dependencies` + `noBump` for **pip**, **npm**, and **github-actions**) only stick if those labels already exist. Without `noBump`, Semver CI fails on Dependabot PRs. Include the `npm` block only when the repo has a `package.json` (adjust `directory:` for monorepos, e.g. `/services/frontend`).
 
@@ -12,6 +12,14 @@ Dependabot’s `labels:` (template: `dependencies` + `noBump` for **pip**, **npm
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+```
+
+Optional lighter post-merge matrix (no `event_name` expressions in the thin file):
+
+```yaml
+with:
+  python-versions: '["3.11","3.12","3.13"]'
+  python-versions-push: '["3.11","3.13"]'
 ```
 
 Reference: [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper).
