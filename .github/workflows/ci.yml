@@ -92,10 +92,12 @@ jobs:
       pytest-args: ${{ inputs.pytest-args || '-q' }}
 
   # Leaf name "CI" → consumer job named CI reports check "CI / CI".
+  # !cancelled(): skip gate when concurrency cancels an in-flight run (avoids a
+  # false FAILURE that blocks merge while the surviving run is green).
   ci:
     name: CI
     needs: [detect, python]
-    if: always()
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
