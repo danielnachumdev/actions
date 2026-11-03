@@ -18,7 +18,7 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
 | Pinning (consumers) | Prefer **`@v1`**; **`@latest`** only if CD opts into `retags: '["latest"]'` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| Secrets | Never commit API tokens, `.pypirc`, or credential files. Thin CD may map `PYPI_API_TOKEN` by name (empty OK for OIDC / PyPI-off). |
+| Secrets | Never commit API tokens, `.pypirc`, or credential files. Thin CD may map `PYPI_API_TOKEN` by name (needed for `publish-pypi: true`; empty OK when PyPI-off / OIDC is caller-inlined). |
 
 ```text
 .
@@ -103,7 +103,7 @@ jobs:
 # CD — after successful CI on main
 permissions:
   contents: write
-  id-token: write  # required by semver-cd even if publish-pypi is false
+  # id-token: write  # only if you inline Trusted Publishing in this workflow
 jobs:
   semver:
     name: Semver
@@ -111,12 +111,11 @@ jobs:
     with:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}
-      # publish-pypi: true
-      # pypi-auth: trusted-publishing  # or token
+      # publish-pypi: true  # token path (requires PYPI_API_TOKEN)
       # Opt-in floating tags (empty/omit = no retag job):
       retags: '["latest"]'
     secrets:
-      # User repos: map by name (inherit is org/enterprise only). Empty OK for OIDC.
+      # User repos: map by name (inherit is org/enterprise only). Empty OK when PyPI-off.
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 ```
 
@@ -164,8 +163,7 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `dry-run` | `false` | Resolve only |
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
-| `publish-pypi` | `false` | Upload release wheel to PyPI |
-| `pypi-auth` | `trusted-publishing` | `trusted-publishing` (OIDC) or `token` (`PYPI_API_TOKEN`); caller chooses, no auto-fallback |
+| `publish-pypi` | `false` | Upload release wheel to PyPI via **API token** only |
 | `retags` | `""` | JSON array of floating tags to force-move after release; `""` / `[]` = no-op |
 | `timeout-minutes` | `30` | Semver job (bump / build / release) |
 | `pypi-timeout-minutes` | `15` | Opt-in PyPI publish job |
@@ -187,15 +185,15 @@ Caller needs `permissions: contents: write`. Only moves tags listed in `tags`.
 
 | Secret | Required | Meaning |
 | ------ | -------- | ------- |
-| `PYPI_API_TOKEN` | no | Required when `pypi-auth: token`; unused for `trusted-publishing` |
+| `PYPI_API_TOKEN` | no | Required when `publish-pypi: true`; unused when PyPI-off or Trusted Publishing is caller-inlined |
 
 Callers **must**:
 1. Pass `secrets: { PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }} }` — user repos cannot use `secrets: inherit` (org/enterprise only).
-2. Grant `permissions.id-token: write` — `semver-cd`’s PyPI job requests OIDC, and GitHub validates that even when `publish-pypi` is false / the job is skipped.
+2. For **Trusted Publishing**, keep `publish-pypi: false` and inline a `pypi` job in thin `cd.yml` with `permissions.id-token: write` (see HOW-TO-USE). Do not expect OIDC to work from this reusable PyPI job ([warehouse#11096](https://github.com/pypi/warehouse/issues/11096)).
 
-An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
+An unset token is fine (`required: false`) when PyPI-off / caller-inlined OIDC.
 
-On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.yml` with that list as `tags`. Empty `retags` (`""` or `[]`) skips the retag job. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and publishes with the caller’s `pypi-auth`: OIDC (`trusted-publishing`) or `--token` (`token`). This repo’s dogfood `cd.yml` leaves PyPI **off** and opts into `retags: '["latest"]'`.
+On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.yml` with that list as `tags`. Empty `retags` (`""` or `[]`) skips the retag job. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish --token` (`PYPI_API_TOKEN` required). This repo’s dogfood `cd.yml` leaves PyPI **off** and opts into `retags: '["latest"]'`.
 
 ---
 
