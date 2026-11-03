@@ -289,14 +289,16 @@ class TestDependabotAutoMergeWorkflow:
         step = merge_job["steps"][0]
         assert step["name"] == "Merge Dependabot PR"
         assert "Enable" not in step["name"]
+        assert step["env"]["EXPECTED_SHA"] == "${{ github.event.pull_request.head.sha }}"
         step_run = step["run"]
         assert "gh pr diff \"$PR_URL\" --name-only" in step_run
         assert "Skipping merge: PR updates workflow files" in step_run
         assert "gh pr view \"$PR_URL\" --json headRefOid --jq .headRefOid" in step_run
-        assert 'if [ "$HEAD" != "$GITHUB_SHA" ]' in step_run
+        assert 'if [ "$HEAD" != "$EXPECTED_SHA" ]' in step_run
         assert "skipping merge so newer CI can win" in step_run
         assert "gh pr merge --squash --delete-branch" in step_run
         assert "--auto" not in step_run
+        assert "$GITHUB_SHA" not in step_run
         # Workflow-file skip and SHA guard must both precede merge.
         assert step_run.index(".github/workflows/") < step_run.index("gh pr merge")
         assert step_run.index("headRefOid") < step_run.index("gh pr merge")
@@ -335,4 +337,6 @@ class TestDependabotAutoMergeWorkflow:
         reusable = (_WORKFLOWS / "dependabot-auto-merge.yml").read_text(encoding="utf-8")
         assert "aggregate" in reusable
         assert "headRefOid" in reusable
-        assert "github.sha" in reusable
+        assert "github.event.pull_request.head.sha" in reusable
+        assert "ephemeral merge" in reusable
+        assert "pull_request.head.sha" in howto
