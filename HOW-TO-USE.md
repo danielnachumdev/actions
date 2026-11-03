@@ -146,6 +146,24 @@ Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-
 - Always set `id-token: write` on thin CD — `semver-cd` declares an OIDC-capable PyPI job (validated even when skipped). Token path is what we use today.
 
 Default remains **GitHub Release only** (`publish-pypi: false`). CI auto-detects **Python** and/or **Node**.
+
+### Python `__version__` (match CD bump)
+
+Version **source of truth** is GitHub Release tags. CD bumps / stamps `pyproject.toml` `version` into the release checkout, then builds the wheel (and optionally publishes that same wheel to PyPI).
+
+Expose the installed distribution version in package code — **do not hard-code** a string that drifts from CD:
+
+```python
+from importlib.metadata import version
+
+# Use the exact [project].name from pyproject.toml (e.g. "gp_wrapper", "danielutils").
+__version__ = version("your_package_name")
+```
+
+That way `import your_package; your_package.__version__` always reports the version stamped into the installed wheel. Re-export `__version__` from the package `__init__` if that matches your public API style.
+
+The wheel build script still *can* rewrite a literal `__version__ = "…"` when present (legacy); prefer `importlib.metadata` so source never owns a manual bump.
+
 ## Verify
 
 ```bash
