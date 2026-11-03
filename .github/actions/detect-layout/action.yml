@@ -1,0 +1,56 @@
+# Optional composite (folders ARE allowed under .github/actions/).
+# Prefer the inlined detect step inside ci.yml when calling via workflow_call:
+# relative `uses: ./.github/actions/...` resolves to the *caller* repo, not this one.
+# Call explicitly if needed:
+#   uses: danielnachumdev/actions/.github/actions/detect-layout@v1
+name: Detect layout
+description: >-
+  Inspect working-directory for pyproject; emit run_python and working_directory.
+
+inputs:
+  working-directory:
+    description: Repo-relative app root
+    required: false
+    default: "."
+  pyproject-path:
+    description: Path to pyproject.toml relative to working-directory
+    required: false
+    default: "pyproject.toml"
+  disable-python:
+    description: If true, never select the Python lane
+    required: false
+    default: "false"
+
+outputs:
+  run_python:
+    description: Whether to run the Python/uv pytest lane
+    value: ${{ steps.detect.outputs.run_python }}
+  working_directory:
+    description: Normalized working-directory
+    value: ${{ steps.detect.outputs.working_directory }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        PYPROJECT_PATH: ${{ inputs.pyproject-path }}
+        DISABLE_PYTHON: ${{ inputs.disable-python }}
+      run: |
+        set -euo pipefail
+        root="${WORKING_DIRECTORY:-.}"
+        root="${root#./}"
+        [[ -z "${root}" ]] && root="."
+        pyproject="${root%/}/${PYPROJECT_PATH}"
+        pyproject="${pyproject#./}"
+
+        run_python=false
+        if [[ "${DISABLE_PYTHON}" != "true" && -f "${pyproject}" ]]; then
+          run_python=true
+        fi
+
+        echo "working_directory=${root}" >> "$GITHUB_OUTPUT"
+        echo "run_python=${run_python}" >> "$GITHUB_OUTPUT"
+        echo "detect: root=${root} pyproject=${pyproject} run_python=${run_python}"

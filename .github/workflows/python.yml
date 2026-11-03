@@ -1,13 +1,8 @@
-# Reusable pytest matrix for uv-managed Python packages.
+# Python/uv pytest matrix lane. Prefer calling ci.yml unless you need this alone.
 #
-# Caller example:
-#   jobs:
-#     test:
-#       uses: danielnachumdev/actions/.github/workflows/reusable-python-uv-ci.yml@v1
-#       with:
-#         python-versions: '["3.11","3.12","3.13"]'
+#   uses: danielnachumdev/actions/.github/workflows/python.yml@v1
 
-name: Reusable Python uv CI
+name: python
 
 on:
   workflow_call:
@@ -16,18 +11,18 @@ on:
         description: JSON array of Python versions
         type: string
         default: '["3.11","3.12","3.13"]'
-      sync-args:
-        description: Extra args to `uv sync` (e.g. "--group dev")
-        type: string
-        default: "--group dev"
-      pytest-args:
-        description: Extra args to `uv run pytest`
-        type: string
-        default: "-q"
       working-directory:
         description: Directory containing pyproject.toml / uv.lock
         type: string
         default: "."
+      sync-args:
+        description: Extra args to uv sync
+        type: string
+        default: "--group dev"
+      pytest-args:
+        description: Extra args to uv run pytest
+        type: string
+        default: "-q"
 
 permissions:
   contents: read
@@ -46,7 +41,7 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package + deps

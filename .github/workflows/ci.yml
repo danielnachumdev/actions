@@ -1,4 +1,15 @@
-name: CI
+# Public CI entry — short pin:
+#   uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+#
+# Auto-detects Python (pyproject.toml) under working-directory. Path inputs have
+# defaults so most libraries need no `with:` block.
+# Also dogfoods this repository on push/PR to main.
+#
+# Note: GitHub forbids subdirectories under .github/workflows/ for reusable
+# workflows. Organize with short flat names (ci, python, label, release) instead.
+# Composite actions MAY live under .github/actions/<name>/ (see detect-layout).
+
+name: ci
 
 on:
   push:
@@ -6,31 +17,113 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Repo-relative app root (monorepo package dir)
+        type: string
+        default: "."
+      pyproject-path:
+        description: pyproject.toml path relative to working-directory
+        type: string
+        default: "pyproject.toml"
+      python-versions:
+        description: JSON array of Python versions
+        type: string
+        default: '["3.11","3.12","3.13"]'
+      sync-args:
+        description: Extra args to uv sync
+        type: string
+        default: "--group dev"
+      pytest-args:
+        description: Extra args to uv run pytest
+        type: string
+        default: "-q"
+      disable-python:
+        description: If true, never run the Python lane
+        type: boolean
+        default: false
+      allow-empty:
+        description: If true, succeed when no lane is selected
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_call' && github.repository || 'self' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: Unit
-    uses: ./.github/workflows/reusable-python-uv-ci.yml
-    with:
-      python-versions: '["3.11","3.12","3.13"]'
-      sync-args: "--group dev"
-      pytest-args: "-q"
+  detect:
+    name: Detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_python: ${{ steps.layout.outputs.run_python }}
+      working_directory: ${{ steps.layout.outputs.working_directory }}
+    steps:
+      - uses: actions/checkout@v7
+      # Inline detect (not ./.github/actions/…): relative action paths resolve to the
+      # *caller* repo when this workflow is used via workflow_call.
+      - name: Detect layout
+        id: layout
+        env:
+          WORKING_DIRECTORY: ${{ inputs.working-directory || '.' }}
+          PYPROJECT_PATH: ${{ inputs.pyproject-path || 'pyproject.toml' }}
+          DISABLE_PYTHON: ${{ inputs.disable-python == true && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          root="${WORKING_DIRECTORY:-.}"
+          root="${root#./}"
+          [[ -z "${root}" ]] && root="."
+          pyproject="${root%/}/${PYPROJECT_PATH}"
+          pyproject="${pyproject#./}"
 
+          run_python=false
+          if [[ "${DISABLE_PYTHON}" != "true" && -f "${pyproject}" ]]; then
+            run_python=true
+          fi
+
+          echo "working_directory=${root}" >> "$GITHUB_OUTPUT"
+          echo "run_python=${run_python}" >> "$GITHUB_OUTPUT"
+          echo "detect: root=${root} pyproject=${pyproject} run_python=${run_python}"
+
+  python:
+    name: Python
+    needs: [detect]
+    if: needs.detect.outputs.run_python == 'true'
+    uses: ./.github/workflows/python.yml
+    with:
+      working-directory: ${{ needs.detect.outputs.working_directory }}
+      python-versions: ${{ inputs.python-versions || '["3.11","3.12","3.13"]' }}
+      sync-args: ${{ inputs.sync-args || '--group dev' }}
+      pytest-args: ${{ inputs.pytest-args || '-q' }}
+
+  # Leaf name "CI" → consumer job named CI reports check "CI / CI".
   ci:
     name: CI
-    needs: [test]
+    needs: [detect, python]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require test matrix success
+      - name: Require success or intentional skip
+        env:
+          RUN_PYTHON: ${{ needs.detect.outputs.run_python }}
+          PYTHON_RESULT: ${{ needs.python.result }}
+          ALLOW_EMPTY: ${{ inputs.allow-empty == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
-          [[ "${{ needs.test.result }}" == "success" ]]
+          echo "run_python=${RUN_PYTHON} python_result=${PYTHON_RESULT} allow_empty=${ALLOW_EMPTY}"
+          if [[ "${RUN_PYTHON}" == "true" ]]; then
+            [[ "${PYTHON_RESULT}" == "success" ]]
+            exit 0
+          fi
+          if [[ "${ALLOW_EMPTY}" == "true" ]]; then
+            echo "OK empty (no lanes)"
+            exit 0
+          fi
+          echo "FAIL: no CI lane selected (set allow-empty: true or add pyproject.toml)"
+          exit 1

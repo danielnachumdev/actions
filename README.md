@@ -2,35 +2,49 @@
 
 **Shared GitHub Actions + release standards** for [danielnachumdev](https://github.com/danielnachumdev) repositories.
 
-This repo is both:
+Reusable **workflows** must live flat under `.github/workflows/` (GitHub does **not** allow subfolders there). We use **short declarative filenames** instead. Composite **actions** may use folders under `.github/actions/`.
 
-1. **Reference** — playbook, templates, and examples for CI/CD and repo hygiene  
-2. **Consumable** — versioned reusable workflows you call with `uses: danielnachumdev/actions/...@v1`
-
-Product repos stay thin: they own domain tests and packaging; this repo owns label-driven semver, shared Python-uv CI, and the scripts behind them.
-
-## Consume
-
-Pin a **tag** (not `main`):
+## Consume (short pins)
 
 ```yaml
 jobs:
-  test:
-    uses: danielnachumdev/actions/.github/workflows/reusable-python-uv-ci.yml@v1
-    with:
-      python-versions: '["3.11","3.12","3.13"]'
-      sync-args: "--group dev"
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    # with:                    # all optional
+    #   working-directory: .   # monorepo package dir
+    #   pyproject-path: pyproject.toml
+    #   python-versions: '["3.11","3.12","3.13"]'
+    #   sync-args: "--group dev"
+    #   pytest-args: "-q"
 ```
 
-| Workflow | Purpose |
-| -------- | ------- |
-| `reusable-python-uv-ci.yml` | `uv sync` + pytest matrix |
-| `reusable-release-label.yml` | PR must have exactly one of `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` |
-| `reusable-semver-github-release.yml` | After CI on `main`: bump → wheel → GitHub Release |
+```yaml
+jobs:
+  label:
+    name: Label
+    uses: danielnachumdev/actions/.github/workflows/label.yml@v1
+  release:
+    name: Release
+    uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+    with:
+      sha: ${{ github.sha }}
+```
+
+| Workflow | Role |
+| -------- | ---- |
+| **`ci.yml`** | Entry: detect `pyproject.toml` → Python/`uv` pytest matrix → aggregate **`CI`** |
+| **`python.yml`** | Python lane only (usually via `ci.yml`) |
+| **`label.yml`** | PR must have exactly one of `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` |
+| **`release.yml`** | After CI on `main`: semver bump → wheel → GitHub Release |
 
 Copy-paste starters: [`templates/workflows/`](templates/workflows/) · [`templates/github/`](templates/github/)  
-End-to-end library example: [`examples/python-uv-library/`](examples/python-uv-library/)  
-Full checklist: [`PLAYBOOK.md`](PLAYBOOK.md)
+Walkthrough: [`examples/python-uv-library/`](examples/python-uv-library/)  
+Checklist: [`PLAYBOOK.md`](PLAYBOOK.md)
+
+### Why not `uses: danielnachumdev/actions@v1`?
+
+That short form is for **Actions** (`action.yml`). Multi-job CI/CD uses **reusable workflows**, which require `.github/workflows/<file>.yml@ref`. We keep `<file>` short (`ci`, `label`, `release`).
 
 ## Scripts
 
@@ -39,10 +53,10 @@ Full checklist: [`PLAYBOOK.md`](PLAYBOOK.md)
 | `scripts/release/release_semver.py` | Label → next `vX.Y.Z` (or skip on `noBump`) |
 | `scripts/release/build_python_uv_wheel.sh` | Stamp version + `uv build --wheel` |
 
-## Develop this repo
+## Develop
 
-See [`AGENTS.md`](AGENTS.md). Tests: `uv sync --group dev && uv run pytest -q`.
+See [`AGENTS.md`](AGENTS.md). `uv sync --group dev && uv run pytest -q`.
 
 ## Versioning
 
-Breaking workflow/input changes → new major tag (`v2`). Callers should pin `@v1` or a full `v1.x.y` tag.
+Pin **`@v1`**. Breaking input/check-name changes → `v2`.

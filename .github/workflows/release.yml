@@ -1,11 +1,9 @@
-# After CI on main: resolve PR bump label → build wheel → GitHub Release.
-# Intended to be called from a thin product-repo CD workflow that already
-# gated on successful CI (workflow_run) or workflow_dispatch.
+# Semver GitHub Release — short pin:
+#   uses: danielnachumdev/actions/.github/workflows/release.yml@v1
 #
-# Caller must pass the commit SHA to release. Build runs in the caller repo
-# checkout; standards scripts are fetched from this repository.
+# Call from a thin product CD workflow after successful CI (workflow_run) or dispatch.
 
-name: Reusable semver GitHub Release
+name: release
 
 on:
   workflow_call:
