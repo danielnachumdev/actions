@@ -93,7 +93,7 @@ Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`
 | `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON (both events) |
 | `node-versions` | `["20","22"]` | Matrix JSON (both events) |
 | `sync-args` | `--group dev` | `uv sync` |
-| `pytest-command` | `pytest .` | Invocation under `uv run` (cwd = working-directory) |
+| `pytest-command` | `pytest .` | Invocation under `uv run` (cwd = working-directory; same PR + push) |
 | `pytest-args` | `-q` | Extra args appended after `pytest-command` |
 | `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
 | `detect-timeout-minutes` | `5` | Detect job timeout |
@@ -108,7 +108,6 @@ Optional post-merge overrides (`push` / `workflow_dispatch` only). Omitted or `"
 | `python-versions-push` | `""` | Override Python matrix post-merge |
 | `node-versions-push` | `""` | Override Node matrix post-merge |
 | `sync-args-push` | `""` | Override `uv sync` args post-merge |
-| `pytest-command-push` | `""` | Override pytest command post-merge |
 | `pytest-args-push` | `""` | Override pytest args post-merge |
 | `skip-python-push` | `false` | Skip Python post-merge only |
 | `skip-node-push` | `false` | Skip Node post-merge only |

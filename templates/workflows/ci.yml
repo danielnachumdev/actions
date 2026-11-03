@@ -39,7 +39,7 @@ jobs:
     #   skip-node-push: true                                  # skip Node on push only
     #   # *-push omitted or "" → inherit shared (not a clear). Skip lanes via skip-*-push.
     #   # python-versions-push / node-versions-push / sync-args-push
-    #   # pytest-command-push / pytest-args-push
+    #   # pytest-args-push (pytest-command is shared for PR + push)
     #   # skip-python-push / skip-node-push
     #   # Timeouts (minutes; defaults preserve prior hardcodes):
     #   # detect-timeout-minutes: 5

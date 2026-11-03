@@ -65,16 +65,10 @@ on:
         default: ""
       pytest-command:
         description: >-
-          Pytest invocation under `uv run` in working-directory (shared; both
-          events). Default `pytest .`; override for a suite path/filter.
+          Pytest invocation under `uv run` in working-directory (same for PR and
+          push). Default `pytest .`; override for a suite path/filter.
         type: string
         default: "pytest ."
-      pytest-command-push:
-        description: >-
-          Optional post-merge override of pytest-command. Omitted or "" inherits
-          shared (not a clear).
-        type: string
-        default: ""
       pytest-args:
         description: Extra args appended after pytest-command (shared; both events)
         type: string
@@ -159,7 +153,6 @@ jobs:
           SYNC_ARGS: ${{ inputs.sync-args || '--group dev' }}
           SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
           PYTEST_COMMAND: ${{ inputs.pytest-command || 'pytest .' }}
-          PYTEST_COMMAND_PUSH: ${{ inputs.pytest-command-push }}
           PYTEST_ARGS: ${{ inputs.pytest-args || '-q' }}
           PYTEST_ARGS_PUSH: ${{ inputs.pytest-args-push }}
           SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
@@ -196,7 +189,7 @@ jobs:
           python_versions="$(pick "${PYTHON_VERSIONS}" "${PYTHON_VERSIONS_PUSH}")"
           node_versions="$(pick "${NODE_VERSIONS}" "${NODE_VERSIONS_PUSH}")"
           sync_args="$(pick "${SYNC_ARGS}" "${SYNC_ARGS_PUSH}")"
-          pytest_command="$(pick "${PYTEST_COMMAND}" "${PYTEST_COMMAND_PUSH}")"
+          pytest_command="${PYTEST_COMMAND}"
           pytest_args="$(pick "${PYTEST_ARGS}" "${PYTEST_ARGS_PUSH}")"
 
           if [[ "${event_kind}" == "push" ]]; then

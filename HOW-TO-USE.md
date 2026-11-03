@@ -97,9 +97,10 @@ jobs:
 
 ### Override the pytest command
 
-Default Python lane runs `uv run pytest . -q` in `working-directory`. Pass
-`pytest-command` to change the invocation (suite path, markers, etc.); `pytest-args`
-are still appended. For several suites, call `python.yml` once per job:
+Default Python lane runs `uv run pytest . -q` in `working-directory` on **both**
+PR and push. Pass `pytest-command` to change the invocation (suite path, markers,
+etc.) for both events; `pytest-args` are still appended (optional `pytest-args-push`
+only). For several suites, call `python.yml` once per job:
 
 ```yaml
 jobs:
@@ -125,7 +126,6 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
     with:
       pytest-command: pytest tests/unit
-      # pytest-command-push: pytest tests/unit   # optional post-merge override
 ```
 
 **Empty-string semantics:** omitting a `*-push` input and passing `""` are the same —

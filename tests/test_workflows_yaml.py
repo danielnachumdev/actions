@@ -59,7 +59,6 @@ class TestCiWorkflow:
             "sync-args",
             "sync-args-push",
             "pytest-command",
-            "pytest-command-push",
             "pytest-args",
             "pytest-args-push",
             "skip-python-push",
@@ -75,7 +74,7 @@ class TestCiWorkflow:
             assert not key.startswith("skip-") or key.endswith("-push"), key
         assert inputs["python-versions-push"]["default"] == ""
         assert inputs["pytest-command"]["default"] == "pytest ."
-        assert inputs["pytest-command-push"]["default"] == ""
+        assert "pytest-command-push" not in inputs
         assert inputs["skip-python-push"]["default"] is False
         jobs = data["jobs"]
         assert "detect" in jobs and "python" in jobs and "node" in jobs and "ci" in jobs
