@@ -17,7 +17,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 - **Overridable job timeouts** — every reusable job has `timeout-minutes` (or lane-specific inputs on `ci.yml` / `semver-cd.yml`)
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
-- **Opt-in floating tags** — pass `retags: '["latest"]'` on CD; prefer **`@v1`** pins
+- **Opt-in floating tags** — pass `retags: '["v1", "latest"]'` on CD; prefer **`@v1`** pins
 - **Opt-in PyPI** — token via reusable job, or Trusted Publishing inlined in the caller’s `cd.yml`
 - **Optional Cloud Run deploy** — WIF → Cloud Build trigger for a SHA (`cloudrun-deploy.yml`)
 - **Optional raft VPS deploy** — SSH + `raft apply` / doctor (`raft-deploy.yml`)
@@ -46,7 +46,7 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
     with:
       sha: ${{ github.event.workflow_run.head_sha }}
-      retags: '["latest"]'   # opt-in; omit / "" / [] = no floating moves
+      retags: '["v1", "latest"]'   # opt-in; omit / "" / [] = no floating moves
 ```
 
 ## Docs

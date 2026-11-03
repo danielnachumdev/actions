@@ -13,7 +13,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 | Pin | Meaning |
 | --- | ------- |
 | **`@v1`** | Stable major contract. **Prefer this.** |
-| **`@latest`** | Newest successful release SHA when CD opts into `retags: '["latest"]'`. |
+| **`@latest`** | Newest successful release SHA when CD includes `latest` in `retags` (template does). |
 
 ## Semver (optional — only if you publish versions)
 
@@ -34,7 +34,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
 6. Pin `@v1`  
 7. PyPI publishers only (Semver CD): **token** → `publish-pypi: true` + `PYPI_API_TOKEN`; **Trusted Publishing** → inline a `pypi` job in thin `cd.yml` (not via the reusable job)   
-8. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
+8. Floating tags (Semver CD): pass `retags: '["v1", "latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
@@ -140,7 +140,7 @@ CD template opt into `latest`):
 # in thin cd.yml → semver-cd
 with:
   sha: ${{ github.event.workflow_run.head_sha }}
-  retags: '["latest"]'   # omit / "" / [] → skip retag job
+  retags: '["v1", "latest"]'   # omit / "" / [] → skip retag job
 ```
 
 ### Optional standalone retag

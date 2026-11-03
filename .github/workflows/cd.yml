@@ -44,8 +44,8 @@ jobs:
       standards-ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
       sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
-      # Opt-in: force-move floating latest after each real release.
-      retags: '["latest"]'
+      # Opt-in: force-move floating v1 + latest after each real release.
+      retags: '["v1", "latest"]'
       # publish-pypi stays false (this repo is not a PyPI package).
       # Timeouts (optional): timeout-minutes / pypi-timeout-minutes / retag-timeout-minutes.
     # User-owned repos cannot use secrets: inherit — pass by name (may be empty).

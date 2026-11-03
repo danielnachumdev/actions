@@ -4,7 +4,7 @@
 2. Copy [`templates/github/`](../../templates/github/) (CODEOWNERS + **dependabot.yml**)  
 3. Create labels **before** Dependabot runs: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
 4. Required checks: **`CI / CI`**, **`Semver / Semver`**  
-5. Pin `@v1` (stable major). Opt into `@latest` via CD `retags: '["latest"]'` (template does)
+5. Pin `@v1` (stable major). Opt into `@latest` via CD `retags: '["v1", "latest"]'` (template does)
 
 Dependabot’s `labels:` (template: `dependencies` + `noBump` for **pip**, **npm**, and **github-actions**) only stick if those labels already exist. Without `noBump`, Semver CI fails on Dependabot PRs. Include the `npm` block only when the repo has a `package.json` (adjust `directory:` for monorepos, e.g. `/services/frontend`).
 

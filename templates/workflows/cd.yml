@@ -54,7 +54,7 @@ jobs:
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
       sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
       # Opt-in: force-move floating latest after each real release (omit/""/[] = no-op).
-      retags: '["latest"]'
+      retags: '["v1", "latest"]'
       # Token path: publish-pypi: true  (requires PYPI_API_TOKEN below)
       # Trusted Publishing: leave publish-pypi false; uncomment the pypi job.
       # Timeouts (minutes; defaults preserve prior hardcodes):
