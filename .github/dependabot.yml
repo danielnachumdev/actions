@@ -1,14 +1,20 @@
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "noBump"
-  - package-ecosystem: "pip"
+      groups:
+        uv-production:
+          dependency-type: "production"
+        uv-development:
+          dependency-type: "development"
+
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
