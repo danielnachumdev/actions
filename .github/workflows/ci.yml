@@ -1,22 +1,16 @@
-# Public CI entry — short pin:
+# Public CI building block — short pin:
 #   uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
 #
-# Auto-detects Python (pyproject.toml) under working-directory. Path inputs have
-# defaults so most libraries need no `with:` block.
-# Also dogfoods this repository on push/PR to main.
+# workflow_call only. This repo dogfoods via check.yml (name: CI).
+# Consumers copy templates/workflows/ci.yml (thin orchestrator).
 #
 # Note: GitHub forbids subdirectories under .github/workflows/ for reusable
-# workflows. Organize with short flat names (ci, python, label, release) instead.
+# workflows. Organize with short flat names (ci, python, semver-ci, semver-cd).
 # Composite actions MAY live under .github/actions/<name>/ (see detect-layout).
 
 name: ci
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
   workflow_call:
     inputs:
       working-directory:
@@ -47,10 +41,6 @@ on:
         description: If true, succeed when no lane is selected
         type: boolean
         default: false
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_call' && github.repository || 'self' }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
 
 permissions:
   contents: read
@@ -102,10 +92,12 @@ jobs:
       pytest-args: ${{ inputs.pytest-args || '-q' }}
 
   # Leaf name "CI" → consumer job named CI reports check "CI / CI".
+  # !cancelled(): skip gate when concurrency cancels an in-flight run (avoids a
+  # false FAILURE that blocks merge while the surviving run is green).
   ci:
     name: CI
     needs: [detect, python]
-    if: always()
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

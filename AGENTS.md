@@ -9,24 +9,29 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 
 | Item | Detail |
 | ---- | ------ |
-| Role | Shared reusable workflows + release scripts + templates |
+| Role | Shared reusable workflows + release scripts + templates; **also a consumer** of those blocks |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Short names | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` |
-| Pinning | **`@v1`** |
+| Building blocks | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` (`workflow_call` only) |
+| Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
+| Pinning (consumers) | **`@v1`** (floating major, moved by `semver-cd` on each release) |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
-.github/workflows/ci.yml         # public CI entry (+ dogfood)
+.github/workflows/ci.yml         # reusable CI entry (workflow_call only)
 .github/workflows/python.yml     # uv pytest matrix lane
 .github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
-.github/workflows/semver-cd.yml  # CD stage: bump → wheel → GitHub Release
+.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → move vMAJOR
+.github/workflows/check.yml      # dogfood thin CI (name: CI)
+.github/workflows/cd.yml         # dogfood thin CD
 scripts/release/
-templates/
+templates/                       # consumer copy-paste (pins @v1)
 examples/
 tests/
 ```
 
 There is **one semver feature**. `semver-ci` and `semver-cd` are the same rules at different pipeline stages — not a separate “label” product.
+
+Reusable `ci.yml` must **not** self-trigger on push/PR (that would collide with the thin orchestrator filename pattern and skip dogfooding). Triggers live only on thin `check.yml` / consumer `ci.yml`.
 
 ---
 
@@ -82,6 +87,8 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 
+On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current.
+
 ---
 
 ## Pitfalls
@@ -90,6 +97,7 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 2. `uses: ./.github/actions/...` inside `workflow_call` resolves to the **caller** — use full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).
 3. `uses:` must be a literal string.
 4. No `${{ secrets.* }}` inside `workflow_call` `description:` fields.
+5. On **this** repo, thin CI cannot be named `ci.yml` (that file is the reusable block) — use `check.yml` with `name: CI`.
 
 ---
 
@@ -102,4 +110,4 @@ uv run pytest -q
 
 Breaking inputs/check names → new major tag; update templates + [`HOW-TO-USE.md`](HOW-TO-USE.md) + consumers together.
 
-PRs into `main` need exactly one semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
+PRs into `main` need exactly one semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`. Merge on `main` runs dogfood CD and creates the GitHub Release (unless `noBump`).

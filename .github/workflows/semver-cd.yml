@@ -224,6 +224,20 @@ jobs:
             echo "Published ${TAG} (${ACTION})"
           fi
 
+      # Keep floating major pin (e.g. @v1) on the latest release of that major.
+      - name: Move floating major tag
+        if: steps.already.outputs.skip != 'true' && steps.bump.outputs.skip != 'true' && inputs.dry-run != true
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          major="$(echo "${TAG}" | sed -E 's/^(v[0-9]+)\..*/\1/')"
+          [[ "${major}" =~ ^v[0-9]+$ ]]
+          git tag -f "${major}" "${SHA}"
+          git push origin "refs/tags/${major}" --force
+          echo "Moved floating tag ${major} → ${SHA} (${TAG})"
+
       - name: Final outputs
         id: final
         run: |
