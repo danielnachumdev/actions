@@ -202,7 +202,7 @@ Optional job on the thin CI orchestrator (commented example in [`templates/workf
 
 **Gate so merge runs last.** The opt-in job **must** declare `needs:` listing every PR job that must succeed first. Without that edge, GitHub schedules it in parallel with CI; it can fail (or merge too early) while Unit/E2E/Semver are still running. `needs:` is what puts Dependabot merge last in the workflow graph.
 
-**SHA guard before merge.** `needs:` only orders jobs inside *this* workflow run. If Dependabot force-pushes / rebases the PR while an older run’s merge job is still pending, `gh pr merge` would otherwise squash the *new* untested HEAD. The reusable workflow therefore compares the PR’s current `headRefOid` to `github.sha` and **skips merge (exit 0)** when they differ, so the newer CI run wins.
+**SHA guard before merge.** `needs:` only orders jobs inside *this* workflow run. If Dependabot force-pushes / rebases the PR while an older run’s merge job is still pending, `gh pr merge` would otherwise squash the *new* untested HEAD. The reusable workflow therefore compares the PR’s current `headRefOid` to `github.event.pull_request.head.sha` (the tip this run tested — **not** `github.sha`, which on `pull_request` is the ephemeral merge commit) and **skips merge (exit 0)** when they differ, so the newer CI run wins.
 
 Thin CI **with Semver** (template / dogfood shape) — list every sibling PR job:
 

@@ -13,10 +13,13 @@
 # job stays green; merge them manually (or with a PAT outside this workflow).
 #
 # Before merge, this workflow compares the PR's current headRefOid to
-# github.sha. If Dependabot force-pushed / rebased while this run was still
-# pending, HEAD has moved — we exit 0 and skip merge so a newer CI run wins.
-# Sibling needs: alone is not enough: gh pr merge targets current HEAD, not
-# the SHA that this workflow run tested.
+# github.event.pull_request.head.sha (the tip this run tested). Do NOT use
+# github.sha / GITHUB_SHA on pull_request — that is the ephemeral merge
+# commit (base+head), so it never equals headRefOid and would skip every merge.
+# If Dependabot force-pushed / rebased while this run was still pending, HEAD
+# has moved — we exit 0 and skip merge so a newer CI run wins. Sibling needs:
+# alone is not enough: gh pr merge targets current HEAD, not the tip that this
+# workflow run tested.
 #
 # If branch protection requires checks that are not sibling jobs in the same
 # workflow, those still must be green before merge can succeed — represent them
@@ -51,6 +54,7 @@ jobs:
       - name: Merge Dependabot PR
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -59,8 +63,8 @@ jobs:
             exit 0
           fi
           HEAD="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
-          if [ "$HEAD" != "$GITHUB_SHA" ]; then
-            echo "PR HEAD moved ($HEAD != $GITHUB_SHA); skipping merge so newer CI can win."
+          if [ "$HEAD" != "$EXPECTED_SHA" ]; then
+            echo "PR HEAD moved ($HEAD != $EXPECTED_SHA); skipping merge so newer CI can win."
             exit 0
           fi
           gh pr merge --squash --delete-branch "$PR_URL"
