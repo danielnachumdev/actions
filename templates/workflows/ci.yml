@@ -71,6 +71,4 @@ jobs:
   #   permissions:
   #     contents: write
   #     pull-requests: write
-  #   # secrets:
-  #   #   dependabot-merge-token: ${{ secrets.DEPENDABOT_MERGE_TOKEN }}  # optional; workflow-file PRs
   #   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
