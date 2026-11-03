@@ -36,3 +36,12 @@ jobs:
       # Scripts from the same commit as the workflow under test.
       standards-ref: ${{ github.sha }}
       # timeout-minutes: 5
+
+  # Opt-in Dependabot auto-merge (dogfood). Repo Allow auto-merge must be on.
+  dependabot-auto-merge:
+    name: Dependabot auto-merge
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/dependabot-auto-merge.yml

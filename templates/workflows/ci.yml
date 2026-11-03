@@ -52,3 +52,15 @@ jobs:
     with:
       standards-ref: v1
       # timeout-minutes: 5
+
+  # Opt-in Dependabot auto-merge (default off). Also enable repo Allow auto-merge:
+  #   gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true
+  # If classic branch protection requires code-owner reviews with review count 0,
+  # set require_code_owner_reviews=false so Dependabot can land after required checks.
+  # dependabot-auto-merge:
+  #   name: Dependabot auto-merge
+  #   if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+  #   permissions:
+  #     contents: write
+  #     pull-requests: write
+  #   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1

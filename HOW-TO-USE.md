@@ -4,7 +4,7 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
 
@@ -40,6 +40,8 @@ uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 # optional standalone floating-tag mover:
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+# optional Dependabot auto-merge (from thin CI — see below):
+uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 ```
 
 ### Opt-in floating retags (CD)
@@ -159,11 +161,26 @@ EOF
 
 Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-alerts HTTP **204**.
 
-### Dependabot auto-merge (optional)
+### Dependabot auto-merge (optional opt-in)
 
-1. Enable **Allow auto-merge** on the repo (Settings → General, or `gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true`).
-2. Copy [`templates/workflows/dependabot-auto-merge.yml`](templates/workflows/dependabot-auto-merge.yml) to `.github/workflows/`.
-3. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
+Do **not** copy a standalone workflow into every consumer. Call the shared reusable workflow from the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)):
+
+```yaml
+dependabot-auto-merge:
+  name: Dependabot auto-merge
+  if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+  permissions:
+    contents: write
+    pull-requests: write
+  uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+```
+
+Also:
+
+1. Enable **Allow auto-merge** on the repo (`gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true`).
+2. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
+
+Default remains **off** (job commented out in the template).
 
 ### Optional PyPI (same wheel as the GitHub Release)
 
