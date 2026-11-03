@@ -1,6 +1,6 @@
 # How to use
 
-Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
+Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hygiene).
 
 ## Folders
 
@@ -15,7 +15,9 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 | **`@v1`** | Stable major contract. **Prefer this.** |
 | **`@latest`** | Newest successful release SHA when CD opts into `retags: '["latest"]'`. |
 
-## Semver (one feature, two stages)
+## Semver (optional — only if you publish versions)
+
+**Add Semver only when the consumer creates versioned artifacts** (library/CLI wheels, GitHub Releases with tags, optional PyPI). Apps, sites, infra, assignments, and “just deploy `main`” repos should **omit** `semver-ci` / `semver-cd`, bump labels, and the **`Semver / Semver`** required check. CI + optional Dependabot merge (and your own deploy/raft CD) is enough.
 
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
@@ -24,18 +26,19 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 
 ## Wire-up
 
-1. Copy [`templates/workflows/ci.yml`](templates/workflows/ci.yml) + [`cd.yml`](templates/workflows/cd.yml)  
+1. Copy [`templates/workflows/ci.yml`](templates/workflows/ci.yml) (always). Copy [`cd.yml`](templates/workflows/cd.yml) **only if** you use Semver CD or want that thin publish shape.  
 2. Copy [`templates/github/`](templates/github/) CODEOWNERS + dependabot  
-3. Create labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
-   - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`** for pip / npm / github-actions) only apply if those labels **already exist** on the repo. Without `noBump`, Semver CI fails on Dependabot PRs.  
-4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** if using CD); CODEOWNERS `@you`; required review; admin bypass OK  
+3. Labels: always create `dependencies` (and any you use). Create `noBump` / `bumpPatch` / `bumpMinor` / `bumpMajor` **only if** adopting Semver.  
+   - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`**) only apply if those labels **already exist**. With Semver, without `noBump`, Semver CI fails on Dependabot PRs — drop the `noBump` label entry from `dependabot.yml` when Semver is not used.  
+4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
 6. Pin `@v1`  
-7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
-8. Floating tags: pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
+7. PyPI publishers only (Semver CD): `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
+8. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+# Semver — only if this repo publishes versions:
 uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 # optional standalone floating-tag mover:
@@ -195,11 +198,11 @@ Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-
 
 ### Dependabot merge after CI (optional opt-in)
 
-Optional job on the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)). It **merges** the Dependabot PR (squash + delete branch) once sibling jobs have already passed — it does not enable GitHub’s “Allow auto-merge” queue.
+Optional job on the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)). It **merges** the Dependabot PR (squash + delete branch) once sibling jobs have already passed — it does not enable GitHub’s “Allow auto-merge” queue (enable that in repo settings when you want the queue API / UI path as well).
 
 **Gate so merge runs last.** The opt-in job **must** declare `needs:` listing every PR job that must succeed first. Without that edge, GitHub schedules it in parallel with CI; it can fail (or merge too early) while Unit/E2E/Semver are still running. `needs:` is what puts Dependabot merge last in the workflow graph.
 
-Thin CI (this repo’s template / dogfood shape) — list every sibling PR job:
+Thin CI **with Semver** (template / dogfood shape) — list every sibling PR job:
 
 ```yaml
 dependabot-auto-merge:
@@ -212,13 +215,35 @@ dependabot-auto-merge:
   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 ```
 
-Custom orchestrators (e.g. raft with Unit + E2E behind one aggregate success job): `needs:` that aggregate job instead of (or in addition to) leaf jobs — e.g. `needs: [ci]` when `ci` only succeeds after all required lanes pass. Same rule: merge must not start until every required PR check in this workflow has succeeded.
+Thin CI **without Semver**: `needs: [ci]` (or `[test]` / whatever your single required PR job id is) and the same `if:` / permissions / `uses:`.
+
+Custom orchestrators (e.g. raft with Unit + E2E behind one aggregate success job): `needs:` that aggregate job instead of (or in addition to) leaf jobs — e.g. `needs: [ci]` when `ci` only succeeds after all required lanes pass. Same rule: merge must not start until every required PR check **in this workflow** has succeeded.
+
+**Path-filtered / skipped siblings:** If the aggregate job uses `if: always()` so it can succeed while some lane jobs were **skipped**, GitHub still skips dependents of that aggregate unless the Dependabot job’s `if` also continues. Use:
+
+```yaml
+dependabot-auto-merge:
+  name: Dependabot auto-merge
+  needs: [ci]
+  if: >-
+    always() &&
+    needs.ci.result == 'success' &&
+    github.event_name == 'pull_request' &&
+    github.event.pull_request.user.login == 'dependabot[bot]'
+  permissions:
+    contents: write
+    pull-requests: write
+  uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+```
+
+(Replace `ci` with your aggregate job id.) This belongs on the **caller**; the reusable workflow cannot undo skip-propagation by itself.
 
 Also:
 
 1. Job-level `contents: write` and `pull-requests: write` (shown above) so `GITHUB_TOKEN` can merge.
 2. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
 3. If branch protection requires checks that are **not** sibling jobs in this workflow, either add them to `needs:` or they can still block the merge.
+4. Do **not** require **`Semver / Semver`** on repos that omitted Semver.
 
 Default remains **off** (job commented out in the template).
 
