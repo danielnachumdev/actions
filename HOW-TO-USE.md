@@ -29,7 +29,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 3. Create labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
    - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`** for pip / npm / github-actions) only apply if those labels **already exist** on the repo. Without `noBump`, Semver CI fails on Dependabot PRs.  
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** if using CD); CODEOWNERS `@you`; required review; admin bypass OK  
-5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
+5. Enable Security settings (see below) — Dependabot opens PRs; optionally auto-merge (below)  
 6. Pin `@v1`  
 7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
 8. Floating tags: pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
@@ -158,6 +158,12 @@ EOF
 ```
 
 Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-alerts HTTP **204**.
+
+### Dependabot auto-merge (optional)
+
+1. Enable **Allow auto-merge** on the repo (Settings → General, or `gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true`).
+2. Copy [`templates/workflows/dependabot-auto-merge.yml`](templates/workflows/dependabot-auto-merge.yml) to `.github/workflows/`.
+3. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
 
 ### Optional PyPI (same wheel as the GitHub Release)
 
