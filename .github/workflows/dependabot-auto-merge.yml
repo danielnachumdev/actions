@@ -1,8 +1,12 @@
 # Opt-in Dependabot merge. Call from the thin CI orchestrator via workflow_call
 # after sibling PR jobs have passed. The caller must needs: every job that must
-# succeed first so this runs last (thin CI: needs: [ci, semver]; custom
-# orchestrators with an aggregate success job: needs: that aggregate).
+# succeed first so this runs last (with Semver: needs: [ci, semver]; without:
+# needs: [ci] / aggregate id). Custom orchestrators: needs: the aggregate.
 # Job-level contents/pull-requests write required on the caller.
+#
+# Path-filtered graphs: if the aggregate uses if: always() while some lanes are
+# skipped, the caller if must include always() && needs.<id>.result == 'success'
+# or GitHub skips this job while CI is green (see HOW-TO-USE.md).
 #
 # If branch protection requires checks that are not sibling jobs in the same
 # workflow, those still must be green before merge can succeed — represent them
@@ -10,7 +14,7 @@
 #
 #   dependabot-auto-merge:
 #     name: Merge Dependabot PR
-#     needs: [ci, semver]
+#     needs: [ci, semver]   # or [ci] when Semver is omitted
 #     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
 #     permissions:
 #       contents: write

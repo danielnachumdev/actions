@@ -1,6 +1,8 @@
 name: CI
 
-# Thin orchestrator. Prefer requiring checks "CI / CI" and "Semver / Semver".
+# Thin orchestrator. Prefer requiring check "CI / CI".
+# Add Semver (job below + "Semver / Semver" required check) ONLY if this repo
+# publishes versions (releases/tags/wheels). Apps/sites/infra: omit semver.
 # Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
 #
 # Pin @v1 for the stable major contract, or @latest for always-newest release.
@@ -55,8 +57,11 @@ jobs:
 
   # Opt-in: merge Dependabot PRs after sibling CI jobs pass (default off).
   # Must needs: every PR job that must pass first so this runs last in the
-  # workflow graph (thin CI: needs: [ci, semver]). Custom orchestrators with an
-  # aggregate success job (e.g. raft): needs: that aggregate instead.
+  # workflow graph (with Semver: needs: [ci, semver]; without: needs: [ci]).
+  # Custom orchestrators with an aggregate success job: needs: that aggregate.
+  # If that aggregate uses if: always() while path-filtered siblings may be
+  # skipped, gate with always() && needs.<id>.result == 'success' && dependabot
+  # (see HOW-TO-USE.md) or DAM is skipped while CI is green.
   # If classic branch protection requires code-owner reviews with review count 0,
   # set require_code_owner_reviews=false so Dependabot can land after required checks.
   # dependabot-auto-merge:
