@@ -292,6 +292,71 @@ class TestDogfoodCdWorkflow:
         assert "head_branch == 'main'" in job_if
 
 
+class TestRaftDeployWorkflow:
+    def test_parses_required_inputs_and_secret(self):
+        data = _load("raft-deploy.yml")
+        call = _on(data)["workflow_call"]
+        inputs = call["inputs"]
+        for key in ("service", "git-repo", "ref"):
+            assert inputs[key]["required"] is True, key
+        assert inputs["host"]["default"] == ""
+        assert inputs["ssh-user"]["default"] == ""
+        assert inputs["command_timeout"]["default"] == "10m"
+        assert inputs["skip-doctor"]["default"] is False
+        _assert_timeout_input(inputs, "timeout-minutes")
+        assert call["secrets"]["VPS_SSH_KEY"]["required"] is True
+        assert set(inputs) == {
+            "service",
+            "git-repo",
+            "ref",
+            "host",
+            "ssh-user",
+            "command_timeout",
+            "skip-doctor",
+            "timeout-minutes",
+        }
+
+    def test_timeout_wired_and_ssh_script(self):
+        data = _load("raft-deploy.yml")
+        job = data["jobs"]["apply"]
+        _assert_job_timeout_wired(job, "timeout-minutes")
+        steps = job["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        resolve = by_name["Resolve SSH target"]
+        assert "vars.VPS_HOST" in resolve["env"]["VAR_HOST"]
+        assert "vars.VPS_USER" in resolve["env"]["VAR_USER"]
+        assert "::error::" in resolve["run"]
+        assert "VPS_SSH_KEY" in resolve["run"]
+        assert "VPS_HOST" in resolve["run"]
+        ssh = by_name["Apply App + redeploy on VPS"]
+        assert ssh["uses"] == "appleboy/ssh-action@v1.2.0"
+        assert ssh["with"]["command_timeout"] == "${{ inputs.command_timeout }}"
+        assert ssh["with"]["key"] == "${{ secrets.VPS_SSH_KEY }}"
+        script = ssh["with"]["script"]
+        assert 'raft auth test "${SERVICE}" --repo "${GIT_REPO}"' in script
+        assert 'raft apply --git "${GIT_REPO}" --ref "${REF}"' in script
+        assert 'raft doctor "${SERVICE}"' in script
+        assert "SKIP_DOCTOR" in script
+
+    def test_template_calls_reusable(self):
+        data = _load("raft-deploy.yml", templates=True)
+        job = data["jobs"]["apply"]
+        assert (
+            job["uses"]
+            == "danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1"
+        )
+        assert "service" in job["with"]
+        assert "git-repo" in job["with"]
+        assert "ref" in job["with"]
+        assert job["secrets"]["VPS_SSH_KEY"] == "${{ secrets.VPS_SSH_KEY }}"
+        howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
+        assert "### Raft VPS apply / redeploy (optional)" in howto
+        assert "raft-deploy.yml@v1" in howto
+        assert "vars.VPS_HOST" in howto
+
+
 class TestDependabotAutoMergeWorkflow:
     def test_is_reusable_workflow_call(self):
         data = _load("dependabot-auto-merge.yml")

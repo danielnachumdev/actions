@@ -11,7 +11,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 
 ## Why this repo?
 
-- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`
+- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `raft-deploy.yml`
 - **Auto lanes** — Python (`pyproject.toml`) and/or Node (`package.json`)
 - **Shared CI + optional post-merge knobs** — shared defaults; optional `*-push` / `skip-*-push` (no consumer `event_name` expressions)
 - **Overridable job timeouts** — every reusable job has `timeout-minutes` (or lane-specific inputs on `ci.yml` / `semver-cd.yml`)
@@ -52,7 +52,7 @@ jobs:
 | --- | ---- |
 | [`HOW-TO-USE.md`](HOW-TO-USE.md) | Adopt in a consumer repo (checklist) |
 | [`AGENTS.md`](AGENTS.md) | Implementation details for maintainers / coding agents |
-| [`templates/`](templates/) | Copy-paste CI/CD / retag + CODEOWNERS / Dependabot starters |
+| [`templates/`](templates/) | Copy-paste CI/CD / retag / raft-deploy + CODEOWNERS / Dependabot starters |
 
 ## Who it’s for
 

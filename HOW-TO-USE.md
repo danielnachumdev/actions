@@ -4,7 +4,7 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hy
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `raft-deploy.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
 
@@ -45,6 +45,48 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 # optional Dependabot merge after CI (from thin CI — see below):
 uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+# optional raft VPS apply/redeploy (from thin CD — see below):
+uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+```
+
+### Raft VPS apply / redeploy (optional)
+
+Reusable SSH + `raft apply` for App hosts (nachum-mealie CD apply-raft shape). **Not** Semver, Cloud Run, or GHCR — only the VPS apply script.
+
+Copy [`templates/workflows/raft-deploy.yml`](templates/workflows/raft-deploy.yml) or call the reusable workflow from your own CD:
+
+```yaml
+jobs:
+  apply:
+    name: Raft apply
+    uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+    with:
+      service: my-app
+      git-repo: git@github.com:org/repo.git
+      ref: ${{ github.sha }}
+      # host: 192.0.2.10          # optional; empty → vars.VPS_HOST
+      # ssh-user: raft            # optional; empty → vars.VPS_USER → raft
+      # command_timeout: 10m
+      # skip-doctor: false
+      # timeout-minutes: 15
+    secrets:
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+```
+
+**Caller setup**
+
+| Need | Where |
+| ---- | ----- |
+| Host | `with.host` **or** repo/org `vars.VPS_HOST` |
+| SSH user | `with.ssh-user` **or** `vars.VPS_USER` (default `raft`) |
+| SSH key | map `secrets.VPS_SSH_KEY` on the `secrets:` block (required) |
+
+Missing host or SSH key fails with `::error::` (same as mealie). On the VPS the job ensures `raft` is on `PATH`, then:
+
+```bash
+raft auth test "${SERVICE}" --repo "${GIT_REPO}"
+raft apply --git "${GIT_REPO}" --ref "${REF}"
+raft doctor "${SERVICE}"   # skip with skip-doctor: true
 ```
 
 ### Opt-in floating retags (CD)
@@ -150,6 +192,7 @@ Override via `workflow_call` inputs when a lane needs more (or less) time:
 | `semver-ci.yml` | `timeout-minutes` (5) |
 | `semver-cd.yml` | `timeout-minutes` (30), `pypi-timeout-minutes` (15), `retag-timeout-minutes` (10) |
 | `retag.yml` | `timeout-minutes` (10) |
+| `raft-deploy.yml` | `timeout-minutes` (15); SSH `command_timeout` default `10m` |
 
 ```yaml
 # example: longer Python matrix cells
