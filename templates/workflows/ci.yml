@@ -1,13 +1,14 @@
 name: CI
 
-# Thin orchestrator. Prefer requiring check "CI / CI".
-#   uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+# Thin orchestrator. Prefer requiring checks "CI / CI" and "Semver / Semver".
+# Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +17,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   ci:
@@ -27,3 +29,10 @@ jobs:
     #   python-versions: '["3.11","3.12","3.13"]'
     #   sync-args: "--group dev"
     #   pytest-args: "-q"
+
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    with:
+      standards-ref: v1

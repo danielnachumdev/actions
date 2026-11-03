@@ -1,7 +1,6 @@
 # AGENTS.md — danielnachumdev/actions
 
-Implementation and usage guide for **this** standards repo and its consumers.  
-Product pitch: [`README.md`](README.md). Rollout checklist: [`PLAYBOOK.md`](PLAYBOOK.md).
+Implementation and usage guide. Pitch: [`README.md`](README.md). Rollout: [`PLAYBOOK.md`](PLAYBOOK.md).
 
 ---
 
@@ -9,116 +8,87 @@ Product pitch: [`README.md`](README.md). Rollout checklist: [`PLAYBOOK.md`](PLAY
 
 | Item | Detail |
 | ---- | ------ |
-| Role | Shared reusable workflows + release scripts + consumer templates |
-| Python | `>=3.11` test harness only (not a published package) |
-| Pinning | Consumers use **`@v1`** (floating major) or `v1.x.y` |
-| Workflows | **Flat** under `.github/workflows/` only — GitHub **forbids** subdirectories |
-| Actions | Folders **allowed** under `.github/actions/<name>/` |
+| Role | Shared reusable workflows + release scripts + templates |
+| Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
+| Short names | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` |
+| Pinning | **`@v1`** |
+| Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
-.github/workflows/ci.yml       # public CI entry (+ dogfood on push/PR)
-.github/workflows/python.yml   # uv pytest matrix lane
-.github/workflows/label.yml    # release-label gate
-.github/workflows/semver.yml  # bump → wheel → GitHub Release
-.github/actions/detect-layout/ # optional composite (see pitfall below)
-scripts/release/               # release_semver.py, build_python_uv_wheel.sh
-templates/                     # copy-paste consumer starters
-examples/                      # oriented walkthroughs
-tests/                         # pytest for release_semver
-PLAYBOOK.md
+.github/workflows/ci.yml         # public CI entry (+ dogfood)
+.github/workflows/python.yml     # uv pytest matrix lane
+.github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
+.github/workflows/semver-cd.yml  # CD stage: bump → wheel → GitHub Release
+scripts/release/
+templates/
+examples/
+tests/
 ```
+
+There is **one semver feature**. `semver-ci` and `semver-cd` are the same rules at different pipeline stages — not a separate “label” product.
 
 ---
 
-## How consumers call this (short pins)
-
-Reusable workflows **cannot** use `uses: danielnachumdev/actions@v1` — that form is for root `action.yml` **Actions**. Workflows require:
-
-```text
-danielnachumdev/actions/.github/workflows/<file>.yml@v1
-```
-
-Keep `<file>` short: `ci`, `python`, `label`, `semver`.
-
-### CI entry
+## Consumer pins
 
 ```yaml
+# CI — tests + semver label gate
 jobs:
   ci:
     name: CI
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
-    # with:  # all optional
-    #   working-directory: .
-    #   pyproject-path: pyproject.toml
-    #   python-versions: '["3.11","3.12","3.13"]'
-    #   sync-args: "--group dev"
-    #   pytest-args: "-q"
-    #   disable-python: false
-    #   allow-empty: false
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    with:
+      standards-ref: v1
 ```
 
-Prefer requiring branch-protection check **`CI / CI`** (caller job named `CI` + aggregate job named `CI`).
+```yaml
+# CD — after successful CI on main
+jobs:
+  semver:
+    name: Semver
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    with:
+      standards-ref: v1
+      sha: ${{ github.event.workflow_run.head_sha }}
+```
+
+Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
+
+Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label edits re-run `semver-ci`.
+
+### `ci.yml` inputs (optional)
 
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
-| `working-directory` | `.` | App root (monorepo package dir) |
-| `pyproject-path` | `pyproject.toml` | Relative to working-directory; file present → Python lane |
+| `working-directory` | `.` | App root |
+| `pyproject-path` | `pyproject.toml` | Presence → Python lane |
 | `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON |
-| `sync-args` | `--group dev` | Passed to `uv sync` |
-| `pytest-args` | `-q` | Passed to `uv run pytest` |
-| `disable-python` | `false` | Force-skip Python lane |
-| `allow-empty` | `false` | Succeed if no lane selected |
+| `sync-args` | `--group dev` | `uv sync` |
+| `pytest-args` | `-q` | `uv run pytest` |
+| `disable-python` / `allow-empty` | `false` | Lane toggles |
 
-Direct Python lane (rare): `uses: …/python.yml@v1` with the same path/sync/pytest inputs.
+### `semver-cd.yml` inputs
 
-### CD — label + release
-
-Thin consumer `cd.yml` should keep `on: workflow_run` / `pull_request` / `workflow_dispatch` locally, then:
-
-```yaml
-jobs:
-  label:
-    name: Label
-    if: github.event_name == 'pull_request'
-    uses: danielnachumdev/actions/.github/workflows/label.yml@v1
-    with:
-      standards-ref: v1
-
-  semver:
-    name: Semver
-    # if: successful CI on main / dispatch …
-    uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
-    with:
-      standards-ref: v1
-      sha: ${{ github.event.workflow_run.head_sha }}  # or github.sha
-      # dry-run, build-command, python-version, latest-tag-override — optional
-```
-
-Prefer required check **`Label / Label`**.
-
-Release labels (exactly one per PR): `bumpMajor` | `bumpMinor` | `bumpPatch` | `noBump`.
-
-Starters: [`templates/workflows/`](templates/workflows/) · [`templates/github/`](templates/github/).
+| Input | Default | Meaning |
+| ----- | ------- | ------- |
+| `sha` | required | Commit to tag / release |
+| `standards-ref` | `v1` | Ref for scripts checkout |
+| `dry-run` | `false` | Resolve only |
+| `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
+| `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 
 ---
 
-## Scripts
+## Pitfalls
 
-| Path | Role |
-| ---- | ---- |
-| `scripts/release/release_semver.py` | Labels → next `vX.Y.Z` or skip (`noBump`) |
-| `scripts/release/build_python_uv_wheel.sh` | Stamp version + `uv build --wheel` (default for `semver.yml`) |
-
-Custom artifact: pass `build-command` into `semver.yml` (`TAG` is in the environment; command must print `wheel=<path>`).
-
----
-
-## Critical pitfalls
-
-1. **No workflow subdirectories** — cannot `uses: …/.github/workflows/python/ci.yml@v1`. Use flat short names.
-2. **Relative composite actions in `workflow_call`** — `uses: ./.github/actions/…` resolves to the **caller** repo, not this one. `ci.yml` **inlines** detect for that reason. To call the composite explicitly: `uses: danielnachumdev/actions/.github/actions/detect-layout@v1`.
-3. **`uses:` must be a literal** — no `${{ }}` in the `uses:` value.
-4. **Do not put `${{ secrets.* }}` in `workflow_call` input/secret `description:` fields** — GitHub parses expressions there and the workflow can fail to load (0 jobs).
+1. No `.github/workflows/**/subdirs` for reusable workflows.
+2. `uses: ./.github/actions/...` inside `workflow_call` resolves to the **caller** — use full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).
+3. `uses:` must be a literal string.
+4. No `${{ secrets.* }}` inside `workflow_call` `description:` fields.
 
 ---
 
@@ -129,10 +99,6 @@ uv sync --group dev
 uv run pytest -q
 ```
 
-- Change shared CI/release behavior **here**, not by re-vendoring into consumers.
-- Breaking inputs or required check names → new **major** tag (`v2`); update `templates/` + `PLAYBOOK.md` + consumer pins in the same effort.
-- Dogfood: `ci.yml` also runs on push/PR to `main` of this repository.
+Breaking inputs/check names → new major tag; update templates + playbook + consumers together.
 
-### PR habit
-
-Exactly one of `bumpMajor` | `bumpMinor` | `bumpPatch` | `noBump` on PRs into `main`.
+PRs into `main` need exactly one semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.

@@ -1,22 +1,15 @@
 # Example: Python uv library
 
-## Wire-up
-
-1. Copy [`templates/workflows/ci.yml`](../../templates/workflows/ci.yml) → `.github/workflows/ci.yml`  
-2. Copy [`templates/workflows/cd.yml`](../../templates/workflows/cd.yml) → `.github/workflows/cd.yml`  
-3. Copy CODEOWNERS + dependabot from [`templates/github/`](../../templates/github/)  
-4. Labels: `bumpMajor`, `bumpMinor`, `bumpPatch`, `noBump`, `dependencies`  
-5. Required checks: **`CI / CI`**, **`Label / Label`**  
-6. Pin `@v1`
-
-## Pins
+1. Copy [`templates/workflows/ci.yml`](../../templates/workflows/ci.yml) and [`cd.yml`](../../templates/workflows/cd.yml)  
+2. Copy [`templates/github/`](../../templates/github/)  
+3. Labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
+4. Required checks: **`CI / CI`**, **`Semver / Semver`**  
+5. Pin `@v1`
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
-uses: danielnachumdev/actions/.github/workflows/label.yml@v1
-uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 ```
 
-## Reference
-
-[gp_wrapper](https://github.com/danielnachumdev/gp_wrapper) — first library consumer.
+Reference: [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper).

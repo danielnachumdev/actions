@@ -1,9 +1,9 @@
-# PR release-label gate — short pin:
-#   uses: danielnachumdev/actions/.github/workflows/label.yml@v1
+# Semver at CI (PR) — require exactly one bump label.
+#   uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 #
-# Requires exactly one of: bumpMajor | bumpMinor | bumpPatch | noBump
+# Allowed labels: noBump | bumpPatch | bumpMinor | bumpMajor
 
-name: label
+name: semver-ci
 
 on:
   workflow_call:
@@ -18,8 +18,8 @@ permissions:
   pull-requests: read
 
 jobs:
-  label:
-    name: Label
+  semver:
+    name: Semver
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

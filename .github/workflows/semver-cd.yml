@@ -1,9 +1,10 @@
-# Semver GitHub Release — short pin:
-#   uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
+# Semver at CD — bump from PR labels, build wheel, GitHub Release.
+#   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
-# Call from a thin product CD workflow after successful CI (workflow_run) or dispatch.
+# Allowed labels (from merged PR): noBump | bumpPatch | bumpMinor | bumpMajor
+# Call after successful CI on main (workflow_run) or workflow_dispatch.
 
-name: semver
+name: semver-cd
 
 on:
   workflow_call:
@@ -51,7 +52,7 @@ permissions:
 
 jobs:
   semver:
-    name: semver
+    name: Semver
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:

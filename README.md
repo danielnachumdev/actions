@@ -9,11 +9,11 @@ Stop copying the same pytest matrix and release YAML into every library. **Pin `
 
 ## Why this repo?
 
-- **Short, declarative workflow names** — `ci.yml`, `label.yml`, `semver.yml` (as short as reusable workflows allow)
-- **Defaults that fit uv libraries** — Python 3.11–3.13, `uv sync --group dev`, pytest — override only when you need to
-- **Auto-detect** — finds `pyproject.toml` and runs the right lane
-- **Label-driven semver** — `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` → GitHub Release + wheel
-- **Templates included** — CODEOWNERS, Dependabot, thin consumer CI/CD starters
+- **Short workflow names** — `ci.yml`, `semver-ci.yml`, `semver-cd.yml`
+- **One semver concept, two stages** — validate labels in CI; bump + Release in CD
+- **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
+- **Defaults that fit uv libraries** — Python 3.11–3.13, auto-detect `pyproject.toml`
+- **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
 ## Sixty-second start
 
@@ -23,35 +23,28 @@ jobs:
   ci:
     name: CI
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 ```
 
 ```yaml
-# .github/workflows/cd.yml  (label gate + release after CI on main)
+# .github/workflows/cd.yml  (after CI succeeds on main)
 jobs:
-  label:
-    name: Label
-    uses: danielnachumdev/actions/.github/workflows/label.yml@v1
   semver:
     name: Semver
-    uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
     with:
-      sha: ${{ github.sha }}
+      sha: ${{ github.event.workflow_run.head_sha }}
 ```
 
-Copy-paste starters live under [`templates/`](templates/). Full checklist: [`PLAYBOOK.md`](PLAYBOOK.md).
+Starters: [`templates/`](templates/) · checklist: [`PLAYBOOK.md`](PLAYBOOK.md) · details: [`AGENTS.md`](AGENTS.md)
 
 ## Who it’s for
 
-Public and private **Python / uv** libraries in the danielnachumdev namespace (e.g. [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper)). Heavier org stacks (GCP, Terraform, raft boards) stay on their own hubs — this repo stays focused.
-
-## Learn more
-
-| Doc | Audience |
-| --- | -------- |
-| [`AGENTS.md`](AGENTS.md) | Implementers & coding agents — inputs, layout, pitfalls, how to change this repo |
-| [`PLAYBOOK.md`](PLAYBOOK.md) | Rollout checklist for a new consumer |
-| [`examples/python-uv-library/`](examples/python-uv-library/) | End-to-end library wiring |
+**Python / uv** libraries under danielnachumdev (e.g. [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper)). Heavier org stacks stay on their own hubs.
 
 ## License
 
-MIT — reuse freely; pin a tag in production.
+MIT — pin a tag in production.
