@@ -61,9 +61,13 @@ jobs:
       skip-node-push: true                           # optional: skip Node on push only
 ```
 
-Empty `*-push` strings and false `skip-*-push` inherit the shared defaults. Defaults keep
-the **full matrix on both** PR and push. `workflow_dispatch` uses the push knobs.
-Global `disable-python` / `disable-node` kill a lane for every event.
+**Empty-string semantics:** omitting a `*-push` input and passing `""` are the same —
+both **inherit the shared default**. An empty string does **not** clear the matrix or
+mean “no versions”. To skip a lane on push only, set `skip-python-push` /
+`skip-node-push`. Do not pass `'[]'` as a “run nothing” signal (it is a non-empty
+override and will break the matrix). False `skip-*-push` also inherits (lane runs).
+Defaults keep the **full matrix on both** PR and push. `workflow_dispatch` uses the
+push knobs. Global `disable-python` / `disable-node` kill a lane for every event.
 
 ### Security settings (step 5)
 

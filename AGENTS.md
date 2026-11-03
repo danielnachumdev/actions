@@ -97,7 +97,7 @@ Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`
 | `pytest-args` | `-q` | `uv run pytest` |
 | `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
 
-Optional post-merge overrides (`push` / `workflow_dispatch` only). Empty string / `false` → shared default. Defaults preserve full matrices on both events.
+Optional post-merge overrides (`push` / `workflow_dispatch` only). Omitted or `""` / `false` → shared default (empty does **not** clear a matrix; use `skip-*-push` to skip a lane). Do not pass `'[]'` as “run nothing”. Defaults preserve full matrices on both events.
 
 | Input | Default | Meaning |
 | ----- | ------- | ------- |

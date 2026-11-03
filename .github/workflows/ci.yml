@@ -10,8 +10,11 @@
 #
 # Shared inputs run on both pre-merge (pull_request) and post-merge
 # (push / workflow_dispatch). Optional *-push / skip-*-push override only on
-# post-merge when set; empty/false inherits the shared default. Consumers should
-# NOT inject event_name expressions themselves.
+# post-merge when set. For string *-push inputs: omitted and explicit "" both
+# inherit the shared default (-n check) — "" does NOT mean "clear the matrix".
+# To skip a lane on push, use skip-*-push (or disable-* for every event).
+# Do not pass '[]' as a "run nothing" signal; that is a non-empty override.
+# Consumers should NOT inject event_name expressions themselves.
 
 name: ci
 
@@ -35,7 +38,9 @@ on:
         type: string
         default: '["3.11","3.12","3.13"]'
       python-versions-push:
-        description: Override python-versions on push/workflow_dispatch (empty = shared)
+        description: >-
+          Optional post-merge override of python-versions. Omitted or "" inherits
+          shared (not a clear). Use skip-python-push to skip the lane.
         type: string
         default: ""
       node-versions:
@@ -43,7 +48,9 @@ on:
         type: string
         default: '["20","22"]'
       node-versions-push:
-        description: Override node-versions on push/workflow_dispatch (empty = shared)
+        description: >-
+          Optional post-merge override of node-versions. Omitted or "" inherits
+          shared (not a clear). Use skip-node-push to skip the lane.
         type: string
         default: ""
       sync-args:
@@ -51,7 +58,9 @@ on:
         type: string
         default: "--group dev"
       sync-args-push:
-        description: Override sync-args on push/workflow_dispatch (empty = shared)
+        description: >-
+          Optional post-merge override of sync-args. Omitted or "" inherits shared
+          (not a clear).
         type: string
         default: ""
       pytest-args:
@@ -59,7 +68,9 @@ on:
         type: string
         default: "-q"
       pytest-args-push:
-        description: Override pytest-args on push/workflow_dispatch (empty = shared)
+        description: >-
+          Optional post-merge override of pytest-args. Omitted or "" inherits
+          shared (not a clear).
         type: string
         default: ""
       disable-python:
@@ -132,7 +143,7 @@ jobs:
           package_json="${root%/}/${PACKAGE_JSON_PATH}"
           package_json="${package_json#./}"
 
-          # Shared defaults on both events; *-push only on post-merge.
+          # Shared defaults on both events; non-empty *-push only on post-merge.
           if [[ "${EVENT_NAME}" == "pull_request" ]]; then
             event_kind=pr
           else
@@ -141,6 +152,8 @@ jobs:
 
           pick() {
             # pick <shared> <push_override>
+            # Empty push override (omitted or "") → shared. Non-empty → override.
+            # There is no "explicit empty clears the value" mode.
             local shared="$1" push="$2"
             if [[ "${event_kind}" == "push" && -n "${push}" ]]; then
               echo "${push}"

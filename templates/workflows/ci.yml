@@ -36,9 +36,8 @@ jobs:
     #   disable-python: false                                 # never run lane (any event)
     #   disable-node: false
     #   skip-node-push: true                                  # skip Node on push only
-    #   # Optional post-merge overrides (empty/false = shared default):
-    #   # python-versions-push / node-versions-push
-    #   # sync-args-push / pytest-args-push
+    #   # *-push omitted or "" → inherit shared (not a clear). Skip lanes via skip-*-push.
+    #   # python-versions-push / node-versions-push / sync-args-push / pytest-args-push
     #   # skip-python-push / skip-node-push
 
   semver:
