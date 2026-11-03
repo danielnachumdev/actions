@@ -212,6 +212,7 @@ dependabot-auto-merge:
   permissions:
     contents: write
     pull-requests: write
+    workflows: write
   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 ```
 
@@ -233,6 +234,7 @@ dependabot-auto-merge:
   permissions:
     contents: write
     pull-requests: write
+    workflows: write
   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 ```
 
@@ -240,7 +242,7 @@ dependabot-auto-merge:
 
 Also:
 
-1. Job-level `contents: write` and `pull-requests: write` (shown above) so `GITHUB_TOKEN` can merge.
+1. Job-level `contents: write`, `pull-requests: write`, and `workflows: write` (shown above) so `GITHUB_TOKEN` can merge — including Dependabot PRs that edit workflow files under `.github/workflows/`.
 2. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
 3. If branch protection requires checks that are **not** sibling jobs in this workflow, either add them to `needs:` or they can still block the merge.
 4. Do **not** require **`Semver / Semver`** on repos that omitted Semver.

@@ -2,7 +2,8 @@
 # after sibling PR jobs have passed. The caller must needs: every job that must
 # succeed first so this runs last (with Semver: needs: [ci, semver]; without:
 # needs: [ci] / aggregate id). Custom orchestrators: needs: the aggregate.
-# Job-level contents/pull-requests write required on the caller.
+# Job-level contents/pull-requests/workflows write required on the caller
+# (workflows: write is required when the PR updates workflow files).
 #
 # Path-filtered graphs: if the aggregate uses if: always() while some lanes are
 # skipped, the caller if must include always() && needs.<id>.result == 'success'
@@ -19,6 +20,7 @@
 #     permissions:
 #       contents: write
 #       pull-requests: write
+#       workflows: write
 #     uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 
 name: dependabot-auto-merge
@@ -29,6 +31,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  workflows: write
 
 jobs:
   merge:

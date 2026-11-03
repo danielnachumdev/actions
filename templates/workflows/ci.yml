@@ -71,4 +71,5 @@ jobs:
   #   permissions:
   #     contents: write
   #     pull-requests: write
+  #     workflows: write
   #   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
