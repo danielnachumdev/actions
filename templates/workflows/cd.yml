@@ -1,7 +1,9 @@
 name: CD
 
 # Thin orchestrator. Semver at CD = bump → wheel → GitHub Release → move vMAJOR
-# (or skip on noBump). Pin:
+# (or skip on noBump). Optional PyPI upload of the same wheel:
+#   publish-pypi: true  +  permissions.id-token: write  (+ optional Environment)
+# Pin:
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 
 on:
@@ -23,6 +25,8 @@ permissions:
   contents: write
   pull-requests: read
   actions: read
+  # Required when publish-pypi: true (Trusted Publishing / OIDC):
+  id-token: write
 
 concurrency:
   group: cd-${{ github.event.workflow_run.head_sha || github.run_id }}
@@ -42,3 +46,8 @@ jobs:
       standards-ref: v1
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
       sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
+      # publish-pypi: true
+      # pypi-environment: pypi   # optional GitHub Environment for OIDC / approvals
+    # secrets:
+    #   PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}  # token fallback; omit for OIDC-only
+    secrets: inherit

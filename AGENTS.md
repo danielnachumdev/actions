@@ -11,7 +11,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | ---- | ------ |
 | Role | Shared reusable workflows + release scripts + templates; **also a consumer** of those blocks |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` (`workflow_call` only) |
+| Building blocks | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` (`workflow_call` only; optional PyPI job) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
 | Pinning (consumers) | **`@v1`** (floating major, moved by `semver-cd` on each release) |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
@@ -20,7 +20,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 .github/workflows/ci.yml         # reusable CI entry (workflow_call only)
 .github/workflows/python.yml     # uv pytest matrix lane
 .github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
-.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → move vMAJOR
+.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → vMAJOR → optional PyPI
 .github/workflows/check.yml      # dogfood thin CI (name: CI)
 .github/workflows/cd.yml         # dogfood thin CD
 scripts/release/
@@ -53,6 +53,9 @@ jobs:
 
 ```yaml
 # CD — after successful CI on main
+permissions:
+  contents: write
+  id-token: write  # when publish-pypi: true
 jobs:
   semver:
     name: Semver
@@ -60,6 +63,9 @@ jobs:
     with:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}
+      # publish-pypi: true
+      # pypi-environment: pypi
+    secrets: inherit  # optional PYPI_API_TOKEN fallback
 ```
 
 Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
@@ -86,8 +92,16 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | `dry-run` | `false` | Resolve only |
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
+| `publish-pypi` | `false` | Upload release wheel to PyPI |
+| `pypi-environment` | empty | GitHub Environment for the PyPI job (OIDC / gates) |
 
-On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current.
+### `semver-cd.yml` secrets
+
+| Secret | Required | Meaning |
+| ------ | -------- | ------- |
+| `PYPI_API_TOKEN` | no | Token fallback; omit when using Trusted Publishing only |
+
+On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current. When `publish-pypi: true`, a follow-up **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
 
 ---
 
