@@ -4,7 +4,7 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hy
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
 
@@ -45,6 +45,8 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 # optional Dependabot merge after CI (from thin CI — see below):
 uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+# optional Cloud Build / Cloud Run deploy (from thin CD — see below):
+uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
 ```
 
 ### Opt-in floating retags (CD)
@@ -150,6 +152,7 @@ Override via `workflow_call` inputs when a lane needs more (or less) time:
 | `semver-ci.yml` | `timeout-minutes` (5) |
 | `semver-cd.yml` | `timeout-minutes` (30), `pypi-timeout-minutes` (15), `retag-timeout-minutes` (10) |
 | `retag.yml` | `timeout-minutes` (10) |
+| `cloudrun-deploy.yml` | `timeout-minutes` (45) |
 
 ```yaml
 # example: longer Python matrix cells
@@ -160,6 +163,35 @@ jobs:
     with:
       python-timeout-minutes: 45
 ```
+
+### Optional Cloud Run / Cloud Build deploy
+
+Reusable job: WIF auth → `setup-gcloud` → `gcloud builds triggers run` for a SHA → stream logs. Path filters, GHCR, and raft SSH stay in the **caller**.
+
+Copy [`templates/workflows/cloudrun-deploy.yml`](templates/workflows/cloudrun-deploy.yml) for a `workflow_dispatch` starter, or call from thin CD:
+
+```yaml
+# in thin cd.yml (after you resolve sha / path filters)
+deploy-cloudrun:
+  name: Deploy Cloud Run
+  # needs: [changes]   # caller-owned gate
+  permissions:
+    contents: read
+    id-token: write
+  uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+  with:
+    workload_identity_provider: projects/…/providers/github
+    service_account: deploy-sa@PROJECT_ID.iam.gserviceaccount.com
+    gcp_project: PROJECT_ID
+    trigger: TRIGGER_ID_OR_NAME
+    sha: ${{ needs.changes.outputs.sha }}
+    # trigger_region: us-central1   # omit / "" = global
+    # timeout-minutes: 45
+```
+
+Caller needs `permissions.id-token: write` (and `contents: read` as needed).
+
+**WIF vs PyPI OIDC:** GCP Workload Identity pools usually trust `attribute.repository` (the **calling** consumer repo). Unlike PyPI Trusted Publishing, you typically do **not** bind on `job_workflow_ref` pointing at this reusable file — condition the pool on the consumer repo (and optional ref).
 
 ### Security settings (step 5)
 
