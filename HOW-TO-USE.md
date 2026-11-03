@@ -163,7 +163,7 @@ Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-
 
 ### Dependabot auto-merge (optional opt-in)
 
-Do **not** copy a standalone workflow into every consumer. Call the shared reusable workflow from the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)):
+Optional job on the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)):
 
 ```yaml
 dependabot-auto-merge:
@@ -177,7 +177,7 @@ dependabot-auto-merge:
 
 Also:
 
-1. Enable **Allow auto-merge** on the repo (`gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true`).
+1. Enable **Allow auto-merge** on the consuming repo (`gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true`).
 2. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
 
 Default remains **off** (job commented out in the template).
