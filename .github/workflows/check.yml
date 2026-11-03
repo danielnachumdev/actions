@@ -46,5 +46,4 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      workflows: write
     uses: ./.github/workflows/dependabot-auto-merge.yml
