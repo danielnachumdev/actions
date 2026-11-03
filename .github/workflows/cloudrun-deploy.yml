@@ -1,0 +1,103 @@
+# Run a Cloud Build trigger for a commit SHA (typically Cloud Run deploy).
+#   uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+#
+# Caller needs permissions:
+#   id-token: write   # Workload Identity Federation (OIDC)
+#   contents: read    # as needed for the thin orchestrator
+#
+# Does not own path filters, GHCR builds, or raft SSH — caller gates those.
+#
+# WIF note: GCP pools usually bind attribute.repository (the *calling* repo).
+# Unlike PyPI Trusted Publishing, you typically do not pin job_workflow_ref to
+# this reusable file; condition on the consumer repo (and optional ref).
+
+name: cloudrun-deploy
+
+on:
+  workflow_call:
+    inputs:
+      workload_identity_provider:
+        description: Full resource name of the WIF provider
+        type: string
+        required: true
+      service_account:
+        description: GCP service account email to impersonate
+        type: string
+        required: true
+      gcp_project:
+        description: GCP project id that owns the Cloud Build trigger
+        type: string
+        required: true
+      trigger:
+        description: Cloud Build trigger id or name
+        type: string
+        required: true
+      sha:
+        description: Commit SHA to deploy
+        type: string
+        required: true
+      trigger_region:
+        description: Cloud Build trigger region (empty = global / omit --region)
+        type: string
+        required: false
+        default: ""
+      timeout-minutes:
+        description: Job timeout for Cloud Build deploy (minutes)
+        type: number
+        default: 45
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.workload_identity_provider }}
+          service_account: ${{ inputs.service_account }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run Cloud Build deploy trigger
+        env:
+          GCP_PROJECT: ${{ inputs.gcp_project }}
+          TRIGGER: ${{ inputs.trigger }}
+          SHA: ${{ inputs.sha }}
+          TRIGGER_REGION: ${{ inputs.trigger_region }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${SHA}" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::sha must be a git commit SHA, got: ${SHA}"
+            exit 1
+          fi
+
+          region_args=()
+          if [ -n "${TRIGGER_REGION}" ]; then
+            region_args+=(--region="${TRIGGER_REGION}")
+          fi
+
+          BUILD_ID="$(gcloud builds triggers run "${TRIGGER}" \
+            --project="${GCP_PROJECT}" \
+            --sha="${SHA}" \
+            "${region_args[@]+"${region_args[@]}"}" \
+            --format='value(metadata.build.id)')"
+
+          if [ -z "${BUILD_ID}" ]; then
+            echo "::error::Cloud Build trigger did not return a build id"
+            exit 1
+          fi
+
+          echo "Started Cloud Build ${BUILD_ID} for ${SHA}"
+          gcloud builds log "${BUILD_ID}" \
+            --project="${GCP_PROJECT}" \
+            "${region_args[@]+"${region_args[@]}"}" \
+            --stream

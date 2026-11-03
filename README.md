@@ -11,7 +11,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 
 ## Why this repo?
 
-- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`
+- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `cloudrun-deploy.yml`
 - **Auto lanes** — Python (`pyproject.toml`) and/or Node (`package.json`)
 - **Shared CI + optional post-merge knobs** — shared defaults; optional `*-push` / `skip-*-push` (no consumer `event_name` expressions)
 - **Overridable job timeouts** — every reusable job has `timeout-minutes` (or lane-specific inputs on `ci.yml` / `semver-cd.yml`)
@@ -19,6 +19,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
 - **Opt-in floating tags** — pass `retags: '["latest"]'` on CD; prefer **`@v1`** pins
 - **Opt-in PyPI** — token via reusable job, or Trusted Publishing inlined in the caller’s `cd.yml`
+- **Optional Cloud Run deploy** — WIF → Cloud Build trigger for a SHA (`cloudrun-deploy.yml`)
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
 ## Sixty-second start
@@ -52,7 +53,7 @@ jobs:
 | --- | ---- |
 | [`HOW-TO-USE.md`](HOW-TO-USE.md) | Adopt in a consumer repo (checklist) |
 | [`AGENTS.md`](AGENTS.md) | Implementation details for maintainers / coding agents |
-| [`templates/`](templates/) | Copy-paste CI/CD / retag + CODEOWNERS / Dependabot starters |
+| [`templates/`](templates/) | Copy-paste CI/CD / retag / Cloud Run + CODEOWNERS / Dependabot starters |
 
 ## Who it’s for
 

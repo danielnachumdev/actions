@@ -1,0 +1,35 @@
+name: Deploy Cloud Run
+
+# Thin orchestrator example: run a Cloud Build trigger for a SHA via WIF.
+# Embed the same job in your CD (path filters / concurrency stay in the caller).
+# Pin:
+#   uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+#
+# Caller needs permissions:
+#   id-token: write
+#   contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA to deploy
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy Cloud Run
+    uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+    with:
+      workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+      service_account: deploy-sa@PROJECT_ID.iam.gserviceaccount.com
+      gcp_project: PROJECT_ID
+      trigger: TRIGGER_ID_OR_NAME
+      sha: ${{ inputs.sha }}
+      # trigger_region: us-central1   # omit / "" = global
+      # timeout-minutes: 45
