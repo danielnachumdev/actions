@@ -95,6 +95,10 @@ Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`
 | `sync-args` | `--group dev` | `uv sync` |
 | `pytest-args` | `-q` | `uv run pytest` |
 | `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
+| `detect-timeout-minutes` | `5` | Detect job timeout |
+| `python-timeout-minutes` | `30` | Passed to `python.yml` per matrix cell |
+| `node-timeout-minutes` | `30` | Passed to `node.yml` per matrix cell |
+| `ci-timeout-minutes` | `5` | CI gate job timeout |
 
 Optional post-merge overrides (`push` / `workflow_dispatch` only). Omitted or `""` / `false` → shared default (empty does **not** clear a matrix; use `skip-*-push` to skip a lane). Do not pass `'[]'` as “run nothing”. Defaults preserve full matrices on both events.
 
@@ -120,6 +124,11 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 | `publish-pypi` | `false` | Upload release wheel to PyPI |
 | `retags` | `""` | JSON array of floating tags to force-move after release; `""` / `[]` = no-op |
+| `timeout-minutes` | `30` | Semver job (bump / build / release) |
+| `pypi-timeout-minutes` | `15` | Opt-in PyPI publish job |
+| `retag-timeout-minutes` | `10` | Passed to `retag.yml` |
+
+Leaf workflows (`python.yml`, `node.yml`, `semver-ci.yml`, `retag.yml`) each expose a single `timeout-minutes` input (defaults `30` / `30` / `5` / `10`) for direct callers.
 
 ### `retag.yml` inputs (standalone or via `semver-cd`)
 
@@ -128,6 +137,7 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `sha` | required | Commit floating tags should point at |
 | `tags` | `["latest"]` | JSON array of tag names to force-move |
 | `dry-run` | `false` | Print planned moves only |
+| `timeout-minutes` | `10` | Retag job timeout |
 
 Caller needs `permissions: contents: write`. Only moves tags listed in `tags`.
 

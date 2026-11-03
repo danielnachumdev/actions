@@ -35,3 +35,4 @@ jobs:
       sha: ${{ inputs.sha }}
       tags: ${{ inputs.tags }}
       dry-run: ${{ inputs.dry_run }}
+      # timeout-minutes: 10

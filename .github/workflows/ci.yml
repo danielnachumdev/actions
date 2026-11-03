@@ -93,6 +93,22 @@ on:
         description: If true, succeed when no lane is selected
         type: boolean
         default: false
+      detect-timeout-minutes:
+        description: Job timeout for Detect (minutes)
+        type: number
+        default: 5
+      python-timeout-minutes:
+        description: Job timeout passed to python.yml per matrix cell (minutes)
+        type: number
+        default: 30
+      node-timeout-minutes:
+        description: Job timeout passed to node.yml per matrix cell (minutes)
+        type: number
+        default: 30
+      ci-timeout-minutes:
+        description: Job timeout for the CI gate job (minutes)
+        type: number
+        default: 5
 
 permissions:
   contents: read
@@ -101,7 +117,7 @@ jobs:
   detect:
     name: Detect
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: ${{ inputs.detect-timeout-minutes }}
     outputs:
       run_python: ${{ steps.layout.outputs.run_python }}
       run_node: ${{ steps.layout.outputs.run_node }}
@@ -215,6 +231,7 @@ jobs:
       python-versions: ${{ needs.detect.outputs.python_versions }}
       sync-args: ${{ needs.detect.outputs.sync_args }}
       pytest-args: ${{ needs.detect.outputs.pytest_args }}
+      timeout-minutes: ${{ inputs.python-timeout-minutes }}
 
   node:
     name: Node
@@ -224,6 +241,7 @@ jobs:
     with:
       working-directory: ${{ needs.detect.outputs.working_directory }}
       node-versions: ${{ needs.detect.outputs.node_versions }}
+      timeout-minutes: ${{ inputs.node-timeout-minutes }}
 
   # Leaf name "CI" → consumer job named CI reports check "CI / CI".
   # !cancelled(): skip gate when concurrency cancels an in-flight run (avoids a
@@ -233,7 +251,7 @@ jobs:
     needs: [detect, python, node]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: ${{ inputs.ci-timeout-minutes }}
     steps:
       - name: Require success or intentional skip
         env:

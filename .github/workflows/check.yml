@@ -26,6 +26,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
     # Event knobs (optional): shared defaults + *-push / skip-*-push.
     # Defaults keep the full matrix on both pull_request and push.
+    # Timeouts (optional): detect-/python-/node-/ci-timeout-minutes.
 
   semver:
     name: Semver
@@ -34,3 +35,4 @@ jobs:
     with:
       # Scripts from the same commit as the workflow under test.
       standards-ref: ${{ github.sha }}
+      # timeout-minutes: 5

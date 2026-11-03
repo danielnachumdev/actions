@@ -46,6 +46,7 @@ jobs:
       # Opt-in: force-move floating latest after each real release.
       retags: '["latest"]'
       # publish-pypi stays false (this repo is not a PyPI package).
+      # Timeouts (optional): timeout-minutes / pypi-timeout-minutes / retag-timeout-minutes.
     # User-owned repos cannot use secrets: inherit — pass by name (may be empty).
     secrets:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

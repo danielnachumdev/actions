@@ -101,6 +101,29 @@ override and will break the matrix). False `skip-*-push` also inherits (lane run
 Defaults keep the **full matrix on both** PR and push. `workflow_dispatch` uses the
 push knobs. Global `disable-python` / `disable-node` kill a lane for every event.
 
+### Job timeouts (optional overrides)
+
+Every reusable job has an explicit `timeout-minutes` (defaults match prior hardcodes).
+Override via `workflow_call` inputs when a lane needs more (or less) time:
+
+| Workflow | Inputs (defaults) |
+| -------- | ----------------- |
+| `ci.yml` | `detect-timeout-minutes` (5), `python-timeout-minutes` (30), `node-timeout-minutes` (30), `ci-timeout-minutes` (5) |
+| `python.yml` / `node.yml` | `timeout-minutes` (30) |
+| `semver-ci.yml` | `timeout-minutes` (5) |
+| `semver-cd.yml` | `timeout-minutes` (30), `pypi-timeout-minutes` (15), `retag-timeout-minutes` (10) |
+| `retag.yml` | `timeout-minutes` (10) |
+
+```yaml
+# example: longer Python matrix cells
+jobs:
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    with:
+      python-timeout-minutes: 45
+```
+
 ### Security settings (step 5)
 
 Enable when the API allows (public repos; free-tier **private** often cannot — Pro or public required for several of these, and for branch protection).

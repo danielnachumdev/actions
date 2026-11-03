@@ -47,6 +47,18 @@ on:
           a real release (e.g. '["latest"]'). Empty string or [] = no-op (skip retag).
         type: string
         default: ""
+      timeout-minutes:
+        description: Job timeout for Semver (bump / build / release) (minutes)
+        type: number
+        default: 30
+      pypi-timeout-minutes:
+        description: Job timeout for the opt-in PyPI publish job (minutes)
+        type: number
+        default: 15
+      retag-timeout-minutes:
+        description: Job timeout passed to retag.yml (minutes)
+        type: number
+        default: 10
     secrets:
       PYPI_API_TOKEN:
         description: Optional PyPI API token (fallback when not using Trusted Publishing)
@@ -71,7 +83,7 @@ jobs:
   semver:
     name: Semver
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: write
       pull-requests: read
@@ -273,6 +285,7 @@ jobs:
       sha: ${{ inputs.sha }}
       tags: ${{ inputs.retags }}
       dry-run: false
+      timeout-minutes: ${{ inputs.retag-timeout-minutes }}
 
   # Opt-in: same wheel as the GitHub Release → PyPI.
   # Prefer Trusted Publishing (OIDC). Fallback: secrets.PYPI_API_TOKEN.
@@ -286,7 +299,7 @@ jobs:
       needs.semver.outputs.skip != 'true' &&
       needs.semver.outputs.tag != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.pypi-timeout-minutes }}
     permissions:
       contents: read
       id-token: write

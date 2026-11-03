@@ -21,6 +21,10 @@ on:
         description: Print planned moves without tagging or pushing
         type: boolean
         default: false
+      timeout-minutes:
+        description: Job timeout for retag (minutes)
+        type: number
+        default: 10
 
 permissions:
   contents: write
@@ -29,7 +33,7 @@ jobs:
   retag:
     name: Retag
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

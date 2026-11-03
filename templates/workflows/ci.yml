@@ -39,6 +39,11 @@ jobs:
     #   # *-push omitted or "" → inherit shared (not a clear). Skip lanes via skip-*-push.
     #   # python-versions-push / node-versions-push / sync-args-push / pytest-args-push
     #   # skip-python-push / skip-node-push
+    #   # Timeouts (minutes; defaults preserve prior hardcodes):
+    #   # detect-timeout-minutes: 5
+    #   # python-timeout-minutes: 30
+    #   # node-timeout-minutes: 30
+    #   # ci-timeout-minutes: 5
 
   semver:
     name: Semver
@@ -46,3 +51,4 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
     with:
       standards-ref: v1
+      # timeout-minutes: 5

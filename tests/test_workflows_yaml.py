@@ -23,6 +23,17 @@ def _on(data: dict) -> dict:
     return block
 
 
+def _assert_timeout_input(inputs: dict, key: str, default: int) -> None:
+    assert key in inputs, key
+    assert inputs[key]["type"] == "number", key
+    assert inputs[key]["default"] == default, key
+
+
+def _assert_job_timeout_wired(job: dict, expression: str) -> None:
+    assert "timeout-minutes" in job, job.get("name", job)
+    assert job["timeout-minutes"] == expression
+
+
 class TestCiWorkflow:
     def test_parses_and_exposes_event_knobs(self):
         data = _load("ci.yml")
@@ -55,6 +66,57 @@ class TestCiWorkflow:
         for key in ("python_versions", "node_versions", "sync_args", "pytest_args"):
             assert key in detect_outputs, key
 
+    def test_timeout_inputs_wired_to_jobs(self):
+        data = _load("ci.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "detect-timeout-minutes", 5)
+        _assert_timeout_input(inputs, "python-timeout-minutes", 30)
+        _assert_timeout_input(inputs, "node-timeout-minutes", 30)
+        _assert_timeout_input(inputs, "ci-timeout-minutes", 5)
+        jobs = data["jobs"]
+        _assert_job_timeout_wired(
+            jobs["detect"], "${{ inputs.detect-timeout-minutes }}"
+        )
+        _assert_job_timeout_wired(jobs["ci"], "${{ inputs.ci-timeout-minutes }}")
+        assert (
+            jobs["python"]["with"]["timeout-minutes"]
+            == "${{ inputs.python-timeout-minutes }}"
+        )
+        assert (
+            jobs["node"]["with"]["timeout-minutes"]
+            == "${{ inputs.node-timeout-minutes }}"
+        )
+
+
+class TestPythonWorkflow:
+    def test_timeout_input_wired(self):
+        data = _load("python.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes", 30)
+        _assert_job_timeout_wired(
+            data["jobs"]["test"], "${{ inputs.timeout-minutes }}"
+        )
+
+
+class TestNodeWorkflow:
+    def test_timeout_input_wired(self):
+        data = _load("node.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes", 30)
+        _assert_job_timeout_wired(
+            data["jobs"]["test"], "${{ inputs.timeout-minutes }}"
+        )
+
+
+class TestSemverCiWorkflow:
+    def test_timeout_input_wired(self):
+        data = _load("semver-ci.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes", 5)
+        _assert_job_timeout_wired(
+            data["jobs"]["semver"], "${{ inputs.timeout-minutes }}"
+        )
+
 
 class TestRetagWorkflow:
     def test_parses_and_requires_sha(self):
@@ -62,10 +124,18 @@ class TestRetagWorkflow:
         inputs = _on(data)["workflow_call"]["inputs"]
         assert inputs["sha"]["required"] is True
         assert inputs["tags"]["default"] == '["latest"]'
-        assert "move-major" not in inputs
+        assert "move-latest" not in inputs
         assert "release-tag" not in inputs
-        assert set(inputs) == {"sha", "tags", "dry-run"}
+        assert set(inputs) == {"sha", "tags", "dry-run", "timeout-minutes"}
         assert "retag" in data["jobs"]
+
+    def test_timeout_input_wired(self):
+        data = _load("retag.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes", 10)
+        _assert_job_timeout_wired(
+            data["jobs"]["retag"], "${{ inputs.timeout-minutes }}"
+        )
 
 
 class TestSemverCdWorkflow:
@@ -93,6 +163,24 @@ class TestSemverCdWorkflow:
         semver_steps = jobs["semver"]["steps"]
         step_names = [s.get("name", "") for s in semver_steps if isinstance(s, dict)]
         assert "Move floating major tag" not in step_names
+
+    def test_timeout_inputs_wired_to_jobs(self):
+        data = _load("semver-cd.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes", 30)
+        _assert_timeout_input(inputs, "pypi-timeout-minutes", 15)
+        _assert_timeout_input(inputs, "retag-timeout-minutes", 10)
+        jobs = data["jobs"]
+        _assert_job_timeout_wired(
+            jobs["semver"], "${{ inputs.timeout-minutes }}"
+        )
+        _assert_job_timeout_wired(
+            jobs["pypi"], "${{ inputs.pypi-timeout-minutes }}"
+        )
+        assert (
+            jobs["retag"]["with"]["timeout-minutes"]
+            == "${{ inputs.retag-timeout-minutes }}"
+        )
 
 
 class TestDogfoodCdWorkflow:

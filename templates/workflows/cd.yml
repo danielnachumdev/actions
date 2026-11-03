@@ -50,6 +50,10 @@ jobs:
       # Opt-in: force-move floating latest after each real release (omit/""/[] = no-op).
       retags: '["latest"]'
       # publish-pypi: true
+      # Timeouts (minutes; defaults preserve prior hardcodes):
+      # timeout-minutes: 30          # bump / build / release
+      # pypi-timeout-minutes: 15
+      # retag-timeout-minutes: 10
     # User-owned repos: pass secrets by name (secrets: inherit is org/enterprise only).
     # Required whenever semver-cd declares secrets: — empty token is OK for OIDC-only.
     secrets:
