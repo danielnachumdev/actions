@@ -1,7 +1,7 @@
 # AGENTS.md — danielnachumdev/actions
 
-Implementation guide for maintainers and coding agents.  
-Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](HOW-TO-USE.md).
+Implementation guide for maintainers and coding agents changing **this** repo.  
+Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW-TO-USE.md`](HOW-TO-USE.md).
 
 ---
 
@@ -10,25 +10,40 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | Item | Detail |
 | ---- | ------ |
 | Role | Shared reusable workflows + release scripts + templates; **also a consumer** of those blocks |
+| Toolchain | [uv](https://docs.astral.sh/uv/) + `pyproject.toml` / `uv.lock` (test harness only — not published) |
+| Python | `>=3.11` (CI matrix **3.11, 3.12, 3.13** via reusable `ci.yml` defaults) |
+| Tests | `tests/` — pytest; **never delete** |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml` (`workflow_call` only; optional PyPI job) |
+| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml` (`workflow_call` only; optional PyPI job on CD) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
 | Pinning (consumers) | Prefer **`@v1`**; **`@latest`** only if CD opts into `retags: '["latest"]'` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
+| Secrets | Never commit API tokens, `.pypirc`, or credential files. Thin CD may map `PYPI_API_TOKEN` by name (empty OK for OIDC / PyPI-off). |
 
 ```text
-.github/workflows/ci.yml         # reusable CI entry (workflow_call only)
-.github/workflows/python.yml     # uv pytest matrix lane
-.github/workflows/node.yml       # Node/TS lint+test matrix lane
-.github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
-.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → optional retag → optional PyPI
-.github/workflows/retag.yml      # force-move explicit floating tags (default: latest)
-.github/workflows/check.yml      # dogfood thin CI (name: CI)
-.github/workflows/cd.yml         # dogfood thin CD
-scripts/release/
-templates/                       # consumer copy-paste CI/CD/retag (pins @v1)
-examples/
-tests/
+.
+├── .github/
+│   ├── CODEOWNERS
+│   ├── dependabot.yml
+│   ├── actions/detect-layout/   # composite used by reusable ci.yml detect
+│   └── workflows/
+│       ├── ci.yml               # reusable CI entry (workflow_call only)
+│       ├── python.yml           # uv pytest matrix lane
+│       ├── node.yml             # Node/TS lint+test matrix lane
+│       ├── semver-ci.yml        # CI stage: validate bump label on PR
+│       ├── semver-cd.yml        # CD: bump → wheel → Release → optional retag → optional PyPI
+│       ├── retag.yml            # force-move explicit floating tags
+│       ├── dependabot-auto-merge.yml
+│       ├── check.yml            # dogfood thin CI (name: CI)
+│       └── cd.yml               # dogfood thin CD
+├── scripts/release/             # release_semver.py, build_python_uv_wheel.sh
+├── templates/                   # consumer copy-paste CI/CD/retag + CODEOWNERS / Dependabot (@v1)
+├── examples/
+├── tests/
+├── pyproject.toml               # test harness (danielnachumdev-actions-tests); not on PyPI
+├── README.md                    # Marketing / consumer pitch
+├── HOW-TO-USE.md                # Consumer adoption checklist
+└── AGENTS.md                    # This file
 ```
 
 There is **one semver feature**. `semver-ci` and `semver-cd` are the same rules at different pipeline stages — not a separate “label” product.
@@ -37,7 +52,34 @@ Reusable `ci.yml` must **not** self-trigger on push/PR (that would collide with 
 
 ---
 
-## Consumer pins
+## Develop this repo
+
+```bash
+uv sync                 # runtime only → .venv (none today)
+uv sync --group dev     # + pytest, pyyaml
+# or: uv sync --all-groups
+```
+
+`tool.uv.default-groups` is empty — `uv sync` does **not** install `dev` by default.
+
+| Task | Command |
+| ---- | ------- |
+| Tests | `uv run pytest -q` |
+| Semver script smoke | `uv run python scripts/release/release_semver.py --latest-tag v1.2.3 --label bumpPatch` |
+
+Config for pytest lives in `pyproject.toml`. Prefer editing floors / deps there and regenerating with `uv lock` / `uv sync --group dev`.
+
+### Changing CI / workflows
+
+1. Edit reusable blocks under `.github/workflows/` (`ci.yml`, `python.yml`, `node.yml`, `semver-*.yml`, `retag.yml`, `dependabot-auto-merge.yml`).
+2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@v1` in templates).
+3. Update [`HOW-TO-USE.md`](HOW-TO-USE.md) + templates when inputs, required check names, or adoption steps change.
+4. Breaking inputs / check names → new **major** tag; update templates + consumers together.
+5. Composite helpers under `.github/actions/` are for **this** repo’s reusable workflows; from `workflow_call`, relative `uses: ./.github/actions/...` resolves to the **caller** — prefer full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).
+
+---
+
+## Consumer pins (contract reference)
 
 ```yaml
 # CI — tests + semver label gate
@@ -165,13 +207,24 @@ On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.ym
 
 ---
 
-## Develop this repo
+## PRs, CI, and releases
 
-```bash
-uv sync --group dev
-uv run pytest -q
-```
+1. Branch off `main`; open a PR into `main`.
+2. Attach **exactly one** semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
+3. **CI** — dogfood `check.yml` → reusable `ci.yml` + `semver-ci.yml`. Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
+4. **CD** — dogfood `cd.yml` → `semver-cd.yml` after CI succeeds on `main`: bump → wheel → GitHub Release → optional `retags` → optional PyPI, or skip on `noBump`.
+5. Version **source of truth** is GitHub Release tags (floating `vMAJOR` / optional `latest` when retags are enabled).
+6. Dependabot PRs stay on `noBump`.
+7. Docs-only / non-release changes use `noBump`.
 
-Breaking inputs/check names → new major tag; update templates + [`HOW-TO-USE.md`](HOW-TO-USE.md) + consumers together.
+### Repo gates (already configured)
 
-PRs into `main` need exactly one semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`. Merge on `main` runs dogfood CD and creates the GitHub Release (unless `noBump`).
+- `.github/CODEOWNERS` — `@danielnachumdev`
+- Prefer required **`CI / CI`** + **`Semver / Semver`**; code-owner reviews; no force-push to `main`
+- Private vulnerability reporting via GitHub Security Advisories when enabled
+
+---
+
+## Sensitive / ignored
+
+Do not commit: `.pypirc`, API tokens, credential JSON, `.venv/`, `venv/`, `dist/`, `__pycache__/`, `.actions-standards/`. Track `uv.lock`. Respect `.gitignore`.
