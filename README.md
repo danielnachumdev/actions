@@ -1,25 +1,32 @@
 # actions
 
-**Shared GitHub Actions + release standards** for [danielnachumdev](https://github.com/danielnachumdev) repositories.
+**One place to standardize CI and releases** across [danielnachumdev](https://github.com/danielnachumdev) repositories — short pins, sensible defaults, label-driven semver.
 
-Reusable **workflows** must live flat under `.github/workflows/` (GitHub does **not** allow subfolders there). We use **short declarative filenames** instead. Composite **actions** may use folders under `.github/actions/`.
+[![CI](https://github.com/danielnachumdev/actions/actions/workflows/ci.yml/badge.svg)](https://github.com/danielnachumdev/actions/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/danielnachumdev/actions)
 
-## Consume (short pins)
+Stop copying the same pytest matrix and release YAML into every library. **Pin `@v1` once**, keep product repos thin, and ship GitHub Releases when a PR says `bumpPatch` — not when someone remembers to bump a version file.
+
+## Why this repo?
+
+- **Short, declarative workflow names** — `ci.yml`, `label.yml`, `release.yml` (as short as reusable workflows allow)
+- **Defaults that fit uv libraries** — Python 3.11–3.13, `uv sync --group dev`, pytest — override only when you need to
+- **Auto-detect** — finds `pyproject.toml` and runs the right lane
+- **Label-driven semver** — `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` → GitHub Release + wheel
+- **Templates included** — CODEOWNERS, Dependabot, thin consumer CI/CD starters
+
+## Sixty-second start
 
 ```yaml
+# .github/workflows/ci.yml
 jobs:
   ci:
     name: CI
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
-    # with:                    # all optional
-    #   working-directory: .   # monorepo package dir
-    #   pyproject-path: pyproject.toml
-    #   python-versions: '["3.11","3.12","3.13"]'
-    #   sync-args: "--group dev"
-    #   pytest-args: "-q"
 ```
 
 ```yaml
+# .github/workflows/cd.yml  (label gate + release after CI on main)
 jobs:
   label:
     name: Label
@@ -31,32 +38,20 @@ jobs:
       sha: ${{ github.sha }}
 ```
 
-| Workflow | Role |
-| -------- | ---- |
-| **`ci.yml`** | Entry: detect `pyproject.toml` → Python/`uv` pytest matrix → aggregate **`CI`** |
-| **`python.yml`** | Python lane only (usually via `ci.yml`) |
-| **`label.yml`** | PR must have exactly one of `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` |
-| **`release.yml`** | After CI on `main`: semver bump → wheel → GitHub Release |
+Copy-paste starters live under [`templates/`](templates/). Full checklist: [`PLAYBOOK.md`](PLAYBOOK.md).
 
-Copy-paste starters: [`templates/workflows/`](templates/workflows/) · [`templates/github/`](templates/github/)  
-Walkthrough: [`examples/python-uv-library/`](examples/python-uv-library/)  
-Checklist: [`PLAYBOOK.md`](PLAYBOOK.md)
+## Who it’s for
 
-### Why not `uses: danielnachumdev/actions@v1`?
+Public and private **Python / uv** libraries in the danielnachumdev namespace (e.g. [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper)). Heavier org stacks (GCP, Terraform, raft boards) stay on their own hubs — this repo stays focused.
 
-That short form is for **Actions** (`action.yml`). Multi-job CI/CD uses **reusable workflows**, which require `.github/workflows/<file>.yml@ref`. We keep `<file>` short (`ci`, `label`, `release`).
+## Learn more
 
-## Scripts
+| Doc | Audience |
+| --- | -------- |
+| [`AGENTS.md`](AGENTS.md) | Implementers & coding agents — inputs, layout, pitfalls, how to change this repo |
+| [`PLAYBOOK.md`](PLAYBOOK.md) | Rollout checklist for a new consumer |
+| [`examples/python-uv-library/`](examples/python-uv-library/) | End-to-end library wiring |
 
-| Path | Role |
-| ---- | ---- |
-| `scripts/release/release_semver.py` | Label → next `vX.Y.Z` (or skip on `noBump`) |
-| `scripts/release/build_python_uv_wheel.sh` | Stamp version + `uv build --wheel` |
+## License
 
-## Develop
-
-See [`AGENTS.md`](AGENTS.md). `uv sync --group dev && uv run pytest -q`.
-
-## Versioning
-
-Pin **`@v1`**. Breaking input/check-name changes → `v2`.
+MIT — reuse freely; pin a tag in production.
