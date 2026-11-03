@@ -1,6 +1,5 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
 # After release: force-move floating tags via retag.yml (latest by default).
-# Floating vMAJOR is manual-only (retag workflow_dispatch with tags including vN).
 # Optional: publish the same wheel to PyPI (Trusted Publishing or token).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
@@ -262,7 +261,6 @@ jobs:
           fi
 
   # Floating tags (latest by default) via reusable retag.yml.
-  # vMAJOR is not auto-moved — update manually via retag workflow_dispatch.
   retag:
     name: Retag
     needs: [semver]

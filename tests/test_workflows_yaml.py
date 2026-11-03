@@ -85,7 +85,6 @@ class TestSemverCdWorkflow:
         assert retag_with["tags"] == "${{ inputs.floating-tags }}"
         # PyPI stays parallel with retag (needs semver only).
         assert jobs["pypi"]["needs"] == ["semver"]
-        # Inline major-move step removed from semver job.
         semver_steps = jobs["semver"]["steps"]
         step_names = [s.get("name", "") for s in semver_steps if isinstance(s, dict)]
         assert "Move floating major tag" not in step_names

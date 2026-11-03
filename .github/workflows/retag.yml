@@ -3,7 +3,6 @@
 #
 # Caller needs permissions: contents: write
 # Moves only the tags listed in `tags` (default: latest).
-# Floating vMAJOR (e.g. v1) is manual — list it explicitly in `tags` when desired.
 
 name: retag
 

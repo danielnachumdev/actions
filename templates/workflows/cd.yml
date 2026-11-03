@@ -1,7 +1,7 @@
 name: CD
 
 # Thin orchestrator. Semver at CD = bump → wheel → GitHub Release → move latest
-# (or skip on noBump). Floating vMAJOR is manual-only. Optional PyPI:
+# (or skip on noBump). Optional PyPI:
 #   publish-pypi: true  +  permissions.id-token: write
 # Pin:
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1

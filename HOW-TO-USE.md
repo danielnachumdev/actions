@@ -12,7 +12,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 
 | Pin | Meaning |
 | --- | ------- |
-| **`@v1`** | Floating major — stable contract. **Prefer this.** Updated **manually** (retag `workflow_dispatch` with `tags: '["v1"]'`). |
+| **`@v1`** | Stable major contract. **Prefer this.** |
 | **`@latest`** | Newest successful release SHA (any major). Force-moved by CD after each release. |
 
 ## Semver (one feature, two stages)
@@ -32,7 +32,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
 6. Pin `@v1`  
 7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
-8. Optional manual retag: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) (CD moves `latest`; use this for `vMAJOR` or recoveries)
+8. Optional standalone retag: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) (CD already moves `latest`)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
@@ -44,10 +44,10 @@ uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 
 ### Optional standalone retag
 
-`semver-cd` force-moves `latest` after each release. Floating `vMAJOR` is
-**manual-only**. Copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
-for a `workflow_dispatch` orchestrator (move `v1`, recover a mistag, custom
-aliases, dry-run):
+`semver-cd` force-moves tags in `floating-tags` (default `latest`) after each
+release. Copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
+for a `workflow_dispatch` orchestrator that force-moves an explicit `tags` list
+to a SHA (recoveries, custom aliases, dry-run):
 
 ```yaml
 # .github/workflows/retag.yml  — see templates/workflows/retag.yml
@@ -57,7 +57,7 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
     with:
       sha: ${{ inputs.sha }}      # required commit SHA
-      tags: '["latest"]'          # or '["v1"]' / '["latest","v1"]'
+      tags: '["latest"]'          # tags to force-move
       dry-run: true               # print planned moves only
 ```
 

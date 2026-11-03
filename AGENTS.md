@@ -13,7 +13,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
 | Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml` (`workflow_call` only; optional PyPI job) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
-| Pinning (consumers) | **`@v1`** (floating major, updated manually) or **`@latest`** (CD-moved each release); prefer `@v1` |
+| Pinning (consumers) | **`@v1`** (stable major contract) or **`@latest`** (CD-moved each release); prefer `@v1` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
@@ -130,7 +130,7 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `tags` | `["latest"]` | JSON array of tag names to force-move |
 | `dry-run` | `false` | Print planned moves only |
 
-Caller needs `permissions: contents: write`. Only moves tags listed in `tags` — no auto-derive of `vMAJOR`. To move `v1`, pass `tags: '["v1"]'` (or include it alongside `latest`) on a deliberate `workflow_dispatch`.
+Caller needs `permissions: contents: write`. Only moves tags listed in `tags`.
 
 ### `semver-cd.yml` secrets
 
@@ -144,7 +144,7 @@ Callers **must**:
 
 An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
-On a successful release, `semver-cd` calls `retag.yml` to force-move `latest` (or whatever is in `floating-tags`) to the release SHA. Floating `vMAJOR` is **not** auto-moved — update it manually via the retag template / `workflow_dispatch` with an explicit `tags` list. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
+On a successful release, `semver-cd` calls `retag.yml` to force-move `latest` (or whatever is in `floating-tags`) to the release SHA. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
 
 ---
 
