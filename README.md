@@ -2,16 +2,19 @@
 
 **One place to standardize CI and releases** across [danielnachumdev](https://github.com/danielnachumdev) repositories — short pins, sensible defaults, label-driven semver.
 
-[![CI](https://github.com/danielnachumdev/actions/actions/workflows/ci.yml/badge.svg)](https://github.com/danielnachumdev/actions/actions/workflows/ci.yml)
+[![CI](https://github.com/danielnachumdev/actions/actions/workflows/check.yml/badge.svg)](https://github.com/danielnachumdev/actions/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/danielnachumdev/actions)
 
 Stop copying the same pytest matrix and release YAML into every library. **Pin `@v1` once**, keep product repos thin, and ship GitHub Releases when a PR says `bumpPatch` — not when someone remembers to bump a version file.
+
+This repository **defines** the reusable workflows and **consumes** them the same way (thin `check.yml` / `cd.yml` → `./` building blocks).
 
 ## Why this repo?
 
 - **Short workflow names** — `ci.yml`, `semver-ci.yml`, `semver-cd.yml`
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
+- **Floating `@v1`** — CD moves the major tag to each new release of that major
 - **Defaults that fit uv libraries** — Python 3.11–3.13, auto-detect `pyproject.toml`
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 

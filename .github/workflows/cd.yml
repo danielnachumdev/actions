@@ -1,0 +1,43 @@
+name: CD
+
+# Dogfood orchestrator — same shape as templates/workflows/cd.yml, relative `./`.
+# Semver at CD: bump → wheel → GitHub Release (+ floating vMAJOR) or skip on noBump.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Resolve bump only; do not create a Release"
+        type: boolean
+        default: true
+      sha:
+        description: "Commit SHA (empty = current GITHUB_SHA)"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: cd-${{ github.event.workflow_run.head_sha || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  semver:
+    name: Semver
+    if: >
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/semver-cd.yml
+    with:
+      standards-ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
+      sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}

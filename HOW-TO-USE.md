@@ -6,12 +6,14 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
 
 GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `semver-ci.yml`, `semver-cd.yml`.
 
+This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
+
 ## Semver (one feature, two stages)
 
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
 | **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → move floating `vMAJOR` |
 
 ## Wire-up
 

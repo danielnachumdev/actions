@@ -1,6 +1,7 @@
 name: CD
 
-# Thin orchestrator. Semver at CD = bump → wheel → GitHub Release (or skip on noBump).
+# Thin orchestrator. Semver at CD = bump → wheel → GitHub Release → move vMAJOR
+# (or skip on noBump). Pin:
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 
 on:
