@@ -1,5 +1,5 @@
 # Run a Cloud Build trigger for a commit SHA (typically Cloud Run deploy).
-#   uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@latest
 #
 # Caller needs permissions:
 #   id-token: write   # Workload Identity Federation (OIDC)

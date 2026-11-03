@@ -2,7 +2,7 @@ name: Terraform
 
 # Thin orchestrator: plan on every PR; plan+apply on push / workflow_dispatch.
 # Pin:
-#   uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
 #
 # Caller needs permissions:
 #   id-token: write
@@ -28,7 +28,7 @@ concurrency:
 jobs:
   terraform:
     name: Terraform
-    uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
     with:
       workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
       service_account: terraform-sa@PROJECT_ID.iam.gserviceaccount.com

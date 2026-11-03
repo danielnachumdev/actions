@@ -345,7 +345,7 @@ class TestRaftDeployWorkflow:
         job = data["jobs"]["apply"]
         assert (
             job["uses"]
-            == "danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1"
+            == "danielnachumdev/actions/.github/workflows/raft-deploy.yml@latest"
         )
         assert "service" in job["with"]
         assert "git-repo" in job["with"]
@@ -353,7 +353,7 @@ class TestRaftDeployWorkflow:
         assert job["secrets"]["VPS_SSH_KEY"] == "${{ secrets.VPS_SSH_KEY }}"
         howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
         assert "### Raft VPS apply / redeploy (optional)" in howto
-        assert "raft-deploy.yml@v1" in howto
+        assert "raft-deploy.yml@latest" in howto
         assert "vars.VPS_HOST" in howto
 
 
@@ -431,17 +431,17 @@ class TestTerraformWorkflow:
 
     def test_template_pins_v1_and_howto_documents_lifecycle(self):
         text = (_TEMPLATES / "terraform.yml").read_text(encoding="utf-8")
-        assert "terraform.yml@v1" in text
+        assert "terraform.yml@latest" in text
         assert "id-token: write" in text
         assert "pull_request" in text
         data = _load("terraform.yml", templates=True)
         job = data["jobs"]["terraform"]
-        assert job["uses"].endswith("terraform.yml@v1")
+        assert job["uses"].endswith("terraform.yml@latest")
         assert "workload_identity_provider" in job["with"]
         assert "service_account" in job["with"]
         howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
         assert "### Terraform plan / apply (optional)" in howto
-        assert "terraform.yml@v1" in howto
+        assert "terraform.yml@latest" in howto
         assert "skip-apply-push" in howto
         assert "plan only" in howto.lower() or "plan-only" in howto.lower()
         assert "attribute.repository" in howto
@@ -501,11 +501,11 @@ class TestCloudrunDeployWorkflow:
 
     def test_template_pins_v1_and_documents_permissions(self):
         text = (_TEMPLATES / "cloudrun-deploy.yml").read_text(encoding="utf-8")
-        assert "cloudrun-deploy.yml@v1" in text
+        assert "cloudrun-deploy.yml@latest" in text
         assert "id-token: write" in text
         data = _load("cloudrun-deploy.yml", templates=True)
         job = data["jobs"]["deploy"]
-        assert job["uses"].endswith("cloudrun-deploy.yml@v1")
+        assert job["uses"].endswith("cloudrun-deploy.yml@latest")
         assert "sha" in job["with"]
         assert "workload_identity_provider" in job["with"]
         assert "service_account" in job["with"]
@@ -514,7 +514,7 @@ class TestCloudrunDeployWorkflow:
 
     def test_howto_documents_wif_caveat(self):
         howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
-        assert "cloudrun-deploy.yml@v1" in howto
+        assert "cloudrun-deploy.yml@latest" in howto
         assert "job_workflow_ref" in howto
         assert "attribute.repository" in howto
 
@@ -552,7 +552,7 @@ class TestDependabotAutoMergeWorkflow:
     def test_template_ci_documents_opt_in_not_default(self):
         """Consumers opt in via thin CI; template must not enable by default."""
         text = (_TEMPLATES / "ci.yml").read_text(encoding="utf-8")
-        assert "dependabot-auto-merge.yml@v1" in text
+        assert "dependabot-auto-merge.yml@latest" in text
         assert "needs: [ci, semver]" in text
         assert "Merge Dependabot PR" in text
         assert "Allow auto-merge" not in text

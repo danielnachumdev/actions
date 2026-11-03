@@ -4,7 +4,7 @@ name: Retag
 # Use this to force-move an explicit `tags` list to a SHA (recoveries, custom
 # aliases, dry-run). For CD-time moves, pass `retags` on semver-cd instead.
 # Pin:
-#   uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
 #
 # Caller needs permissions: contents: write
 
@@ -30,7 +30,7 @@ permissions:
 jobs:
   retag:
     name: Retag
-    uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
     with:
       sha: ${{ inputs.sha }}
       tags: ${{ inputs.tags }}

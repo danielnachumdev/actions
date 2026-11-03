@@ -2,7 +2,7 @@
 # Prefer the inlined detect step inside ci.yml when calling via workflow_call:
 # relative `uses: ./.github/actions/...` resolves to the *caller* repo, not this one.
 # Call explicitly if needed:
-#   uses: danielnachumdev/actions/.github/actions/detect-layout@v1
+#   uses: danielnachumdev/actions/.github/actions/detect-layout@latest
 name: Detect layout
 description: >-
   Inspect working-directory for pyproject; emit run_python and working_directory.

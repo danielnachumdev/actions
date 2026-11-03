@@ -5,19 +5,20 @@
 [![CI](https://github.com/danielnachumdev/actions/actions/workflows/check.yml/badge.svg)](https://github.com/danielnachumdev/actions/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/danielnachumdev/actions)
 
-Stop copying the same pytest matrix and release YAML into every library. **Pin `@v1` once**, keep product repos thin, and ship GitHub Releases when a PR says `bumpPatch` — not when someone remembers to bump a version file.
+Stop copying the same pytest matrix and release YAML into every library. **Pin `@latest`**, keep product repos thin, and ship GitHub Releases when a PR says `bumpPatch` — not when someone remembers to bump a version file.
 
-This repository **defines** the reusable workflows and **consumes** them the same way (thin `check.yml` / `cd.yml` → `./` building blocks).
+This repository **defines** the reusable workflows and **consumes** them the same way (thin `check.yml` / `cd.yml` → `./` building blocks). Dogfood CD opts into `retags: '["latest"]'`, so floating **`latest`** tracks each successful release.
 
 ## Why this repo?
 
-- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`
+- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`
 - **Auto lanes** — Python (`pyproject.toml`) and/or Node (`package.json`)
 - **Shared CI + optional post-merge knobs** — shared defaults; optional `*-push` / `skip-*-push` (no consumer `event_name` expressions)
 - **Overridable job timeouts** — every reusable job has `timeout-minutes` (or lane-specific inputs on `ci.yml` / `semver-cd.yml`)
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
-- **Opt-in floating tags** — pass `retags: '["latest"]'` on CD; prefer **`@v1`** pins
+- **Opt-in floating tags** — pass `retags: '["latest"]'` on CD (dogfood + template do); prefer consumer pins **`@latest`**
+- **Opt-in Dependabot merge** — call `dependabot-auto-merge.yml` from thin CI after sibling jobs pass
 - **Opt-in PyPI** — token via reusable job, or Trusted Publishing inlined in the caller’s `cd.yml`
 - **Optional Cloud Run deploy** — WIF → Cloud Build trigger for a SHA (`cloudrun-deploy.yml`)
 - **Optional raft VPS deploy** — SSH + `raft apply` / doctor (`raft-deploy.yml`)
@@ -31,11 +32,11 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 jobs:
   ci:
     name: CI
-    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
   semver:
     name: Semver
     if: github.event_name == 'pull_request'
-    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
 ```
 
 ```yaml
@@ -43,11 +44,13 @@ jobs:
 jobs:
   semver:
     name: Semver
-    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
     with:
       sha: ${{ github.event.workflow_run.head_sha }}
       retags: '["latest"]'   # opt-in; omit / "" / [] = no floating moves
 ```
+
+Prefer **`@latest`** so consumers track the floating tag CD moves after each release. Pin an immutable release tag (`@v1.5.0`, …) when you need a frozen SHA. Standalone `retag.yml` can move other aliases if you opt in.
 
 ## Docs
 
@@ -59,8 +62,8 @@ jobs:
 
 ## Who it’s for
 
-**Python / uv** libraries under danielnachumdev (e.g. [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper)). Heavier org stacks stay on their own hubs.
+**Python / uv** and **Node** libraries under danielnachumdev (e.g. [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper)), plus thin deploy callers (Cloud Run, raft VPS, Terraform). Heavier org stacks stay on their own hubs.
 
 ## License
 
-MIT — pin a tag in production.
+MIT — prefer `@latest`, or pin an immutable release tag when you need a freeze.

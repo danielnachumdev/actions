@@ -4,14 +4,14 @@
 2. Copy [`templates/github/`](../../templates/github/) (CODEOWNERS + **dependabot.yml**)  
 3. Create labels **before** Dependabot runs: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
 4. Required checks: **`CI / CI`**, **`Semver / Semver`**  
-5. Pin `@v1` (stable major). Opt into `@latest` via CD `retags: '["latest"]'` (template does)
+5. Pin `@latest` (CD opts into `retags: '["latest"]'`). Use an immutable `@vN.N.N` to freeze.
 
 Dependabot’s `labels:` (template: `dependencies` + `noBump` for **pip**, **npm**, and **github-actions**) only stick if those labels already exist. Without `noBump`, Semver CI fails on Dependabot PRs. Include the `npm` block only when the repo has a `package.json` (adjust `directory:` for monorepos, e.g. `/services/frontend`).
 
 ```yaml
-uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
-uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
-uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
+uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
+uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
 ```
 
 Optional lighter post-merge matrix (no `event_name` expressions in the thin file):

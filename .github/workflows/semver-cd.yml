@@ -3,7 +3,7 @@
 # Optional: publish the same wheel to PyPI via API token (publish-pypi).
 # Trusted Publishing (OIDC) must be inlined in the caller's cd.yml — PyPI does
 # not support reusable workflows as Trusted Publishers (warehouse#11096).
-#   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
 #
 # Allowed labels (from merged PR): noBump | bumpPatch | bumpMinor | bumpMajor
 # Call after successful CI on main (workflow_run) or workflow_dispatch.

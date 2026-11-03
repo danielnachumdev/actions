@@ -1,6 +1,6 @@
 # Python/uv pytest matrix lane. Prefer calling ci.yml unless you need this alone.
 #
-#   uses: danielnachumdev/actions/.github/workflows/python.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/python.yml@latest
 
 name: python
 

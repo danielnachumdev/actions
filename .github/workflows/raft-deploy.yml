@@ -1,7 +1,7 @@
 # SSH to a VPS and run raft apply + optional doctor.
 # Matches the nachum-mealie CD apply-raft pattern (auth test → apply → doctor).
 #
-#   uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@latest
 #   with:
 #     service: my-app
 #     git-repo: git@github.com:org/repo.git

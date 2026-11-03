@@ -5,8 +5,8 @@ name: CI
 # publishes versions (releases/tags/wheels). Apps/sites/infra: omit semver.
 # Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
 #
-# Pin @v1 for the stable major contract, or @latest for always-newest release.
-# Prefer @v1 in production consumers.
+# Prefer @latest (CD moves floating latest after each release).
+# Pin an immutable @vN.N.N when you need a freeze.
 
 on:
   push:
@@ -27,7 +27,7 @@ permissions:
 jobs:
   ci:
     name: CI
-    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
     # with:  # all optional — defaults + auto-detect pyproject.toml / package.json
     #   working-directory: .
     #   python-versions: '["3.11","3.12","3.13"]'          # shared (both events)
@@ -50,9 +50,9 @@ jobs:
   semver:
     name: Semver
     if: github.event_name == 'pull_request'
-    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
     with:
-      standards-ref: v1
+      standards-ref: latest
       # timeout-minutes: 5
 
   # Opt-in: merge Dependabot PRs after sibling CI jobs pass (default off).
@@ -71,4 +71,4 @@ jobs:
   #   permissions:
   #     contents: write
   #     pull-requests: write
-  #   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+  #   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@latest

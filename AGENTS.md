@@ -16,7 +16,7 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
 | Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml` (`workflow_call` only; optional PyPI job on CD) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
-| Pinning (consumers) | Prefer **`@v1`**; **`@latest`** only if CD opts into `retags: '["latest"]'` |
+| Pinning (consumers) | Prefer **`@latest`** (CD opts into `retags: '["latest"]'`); immutable `@vN.N.N` to freeze |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 | Secrets | Never commit API tokens, `.pypirc`, or credential files. Thin CD may map `PYPI_API_TOKEN` by name (needed for `publish-pypi: true`; empty OK when PyPI-off / OIDC is caller-inlined). |
 
@@ -40,7 +40,7 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 │       ├── check.yml            # dogfood thin CI (name: CI)
 │       └── cd.yml               # dogfood thin CD
 ├── scripts/release/             # release_semver.py, build_python_uv_wheel.sh
-├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun/raft/terraform + CODEOWNERS / Dependabot (@v1)
+├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun/raft/terraform + CODEOWNERS / Dependabot (@latest)
 ├── examples/
 ├── tests/
 ├── pyproject.toml               # test harness (danielnachumdev-actions-tests); not on PyPI
@@ -75,10 +75,10 @@ Config for pytest lives in `pyproject.toml`. Prefer editing floors / deps there 
 ### Changing CI / workflows
 
 1. Edit reusable blocks under `.github/workflows/` (`ci.yml`, `python.yml`, `node.yml`, `semver-*.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`).
-2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@v1` in templates). Cloud Run, raft, and Terraform are optional (template only; not dogfooded here).
+2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@latest` in templates). Cloud Run, raft, and Terraform are optional (template only; not dogfooded here).
 3. Update [`HOW-TO-USE.md`](HOW-TO-USE.md) + templates when inputs, required check names, or adoption steps change.
 4. Breaking inputs / check names → new **major** tag; update templates + consumers together.
-5. Composite helpers under `.github/actions/` are for **this** repo’s reusable workflows; from `workflow_call`, relative `uses: ./.github/actions/...` resolves to the **caller** — prefer full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).
+5. Composite helpers under `.github/actions/` are for **this** repo’s reusable workflows; from `workflow_call`, relative `uses: ./.github/actions/...` resolves to the **caller** — prefer full `danielnachumdev/actions/...@latest` or inline (as `ci.yml` detect does).
 
 ---
 
@@ -89,7 +89,7 @@ Config for pytest lives in `pyproject.toml`. Prefer editing floors / deps there 
 jobs:
   ci:
     name: CI
-    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
     # with:
     #   python-versions: '["3.11","3.12","3.13"]'
     #   python-versions-push: '["3.11","3.13"]'   # lighter post-merge
@@ -97,9 +97,9 @@ jobs:
   semver:
     name: Semver
     if: github.event_name == 'pull_request'
-    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
     with:
-      standards-ref: v1
+      standards-ref: latest
 ```
 
 ```yaml
@@ -110,9 +110,9 @@ permissions:
 jobs:
   semver:
     name: Semver
-    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
     with:
-      standards-ref: v1
+      standards-ref: latest
       sha: ${{ github.event.workflow_run.head_sha }}
       # publish-pypi: true  # token path (requires PYPI_API_TOKEN)
       # Opt-in floating tags (empty/omit = no retag job):
@@ -162,7 +162,7 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
 | `sha` | required | Commit to tag / release |
-| `standards-ref` | `v1` | Ref for scripts checkout |
+| `standards-ref` | `v1` | Ref for scripts checkout; templates pass `latest` to match `@latest` pins |
 | `dry-run` | `false` | Resolve only |
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
@@ -234,7 +234,7 @@ On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.ym
 ## Pitfalls
 
 1. No `.github/workflows/**/subdirs` for reusable workflows.
-2. `uses: ./.github/actions/...` inside `workflow_call` resolves to the **caller** — use full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).
+2. `uses: ./.github/actions/...` inside `workflow_call` resolves to the **caller** — use full `danielnachumdev/actions/...@latest` or inline (as `ci.yml` detect does).
 3. `uses:` must be a literal string.
 4. No `${{ secrets.* }}` inside `workflow_call` `description:` fields.
 5. On **this** repo, thin CI cannot be named `ci.yml` (that file is the reusable block) — use `check.yml` with `name: CI`.
@@ -247,7 +247,7 @@ On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.ym
 2. Attach **exactly one** semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
 3. **CI** — dogfood `check.yml` → reusable `ci.yml` + `semver-ci.yml`. Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
 4. **CD** — dogfood `cd.yml` → `semver-cd.yml` after CI succeeds on `main`: bump → wheel → GitHub Release → optional `retags` → optional PyPI, or skip on `noBump`.
-5. Version **source of truth** is GitHub Release tags (floating `vMAJOR` / optional `latest` when retags are enabled).
+5. Version **source of truth** is GitHub Release tags (optional floating `latest` when CD `retags` are enabled).
 6. Dependabot PRs stay on `noBump`.
 7. Docs-only / non-release changes use `noBump`.
 

@@ -1,5 +1,5 @@
 # Force-move floating git tags to a SHA.
-#   uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
 #
 # Caller needs permissions: contents: write
 # Moves only the tags listed in `tags` (default: latest).

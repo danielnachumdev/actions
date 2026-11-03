@@ -1,5 +1,5 @@
 # Public CI building block — short pin:
-#   uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
 #
 # workflow_call only. This repo dogfoods via check.yml (name: CI).
 # Consumers copy templates/workflows/ci.yml (thin orchestrator).
