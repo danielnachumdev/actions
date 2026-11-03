@@ -64,8 +64,7 @@ jobs:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}
       # publish-pypi: true
-      # pypi-environment: pypi
-    secrets: inherit  # optional PYPI_API_TOKEN fallback
+    secrets: inherit  # required (workflow declares secrets); token optional
 ```
 
 Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
@@ -93,13 +92,14 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 | `publish-pypi` | `false` | Upload release wheel to PyPI |
-| `pypi-environment` | empty | GitHub Environment for the PyPI job (OIDC / gates) |
 
 ### `semver-cd.yml` secrets
 
 | Secret | Required | Meaning |
 | ------ | -------- | ------- |
 | `PYPI_API_TOKEN` | no | Token fallback; omit when using Trusted Publishing only |
+
+Callers **must** pass `secrets: inherit` (or map `PYPI_API_TOKEN`) whenever they call `semver-cd` — GitHub startup-fails the caller if a reusable workflow declares `secrets:` and the caller omits them.
 
 On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current. When `publish-pypi: true`, a follow-up **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
 
