@@ -1,5 +1,6 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
-# After release: force-move floating tags (latest + vMAJOR) via retag.yml.
+# After release: force-move floating tags via retag.yml (latest by default).
+# Floating vMAJOR is manual-only (retag workflow_dispatch with tags including vN).
 # Optional: publish the same wheel to PyPI (Trusted Publishing or token).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
@@ -45,12 +46,8 @@ on:
         description: If true, apply floating-tags (default includes latest) after release
         type: boolean
         default: true
-      move-major:
-        description: If true, force-move floating vMAJOR (e.g. v1) to the release SHA
-        type: boolean
-        default: true
       floating-tags:
-        description: JSON array of extra floating tags beyond vMAJOR (used when move-latest)
+        description: JSON array of floating tags to force-move after release (when move-latest)
         type: string
         default: '["latest"]'
     secrets:
@@ -264,7 +261,8 @@ jobs:
             echo "version=${{ steps.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
           fi
 
-  # Floating tags (latest + vMAJOR by default) via reusable retag.yml.
+  # Floating tags (latest by default) via reusable retag.yml.
+  # vMAJOR is not auto-moved — update manually via retag workflow_dispatch.
   retag:
     name: Retag
     needs: [semver]
@@ -272,13 +270,11 @@ jobs:
       inputs.dry-run != true &&
       needs.semver.outputs.skip != 'true' &&
       needs.semver.outputs.tag != '' &&
-      (inputs.move-major == true || inputs.move-latest == true)
+      inputs.move-latest == true
     uses: ./.github/workflows/retag.yml
     with:
       sha: ${{ inputs.sha }}
-      release-tag: ${{ needs.semver.outputs.tag }}
-      tags: ${{ inputs.move-latest == true && inputs.floating-tags || '[]' }}
-      move-major: ${{ inputs.move-major }}
+      tags: ${{ inputs.floating-tags }}
       dry-run: false
 
   # Opt-in: same wheel as the GitHub Release → PyPI.

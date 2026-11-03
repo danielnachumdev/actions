@@ -12,17 +12,15 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 
 | Pin | Meaning |
 | --- | ------- |
-| **`@v1`** | Floating major — stays on the latest release of major 1 (stable contract). **Prefer this.** |
-| **`@latest`** | Always the newest successful release SHA (any major). |
-
-Both are force-moved by CD after each release (`semver-cd` → `retag.yml`).
+| **`@v1`** | Floating major — stable contract. **Prefer this.** Updated **manually** (retag `workflow_dispatch` with `tags: '["v1"]'`). |
+| **`@latest`** | Newest successful release SHA (any major). Force-moved by CD after each release. |
 
 ## Semver (one feature, two stages)
 
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
 | **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → floating tags (`latest` + `vMAJOR`) → optional PyPI |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → floating `latest` → optional PyPI |
 
 ## Wire-up
 
@@ -34,7 +32,7 @@ Both are force-moved by CD after each release (`semver-cd` → `retag.yml`).
 5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
 6. Pin `@v1`  
 7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
-8. Optional manual retag only: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) (CD already moves `latest` + `vMAJOR`)
+8. Optional manual retag: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) (CD moves `latest`; use this for `vMAJOR` or recoveries)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
@@ -46,10 +44,10 @@ uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 
 ### Optional standalone retag
 
-`semver-cd` already force-moves `latest` + `vMAJOR` after each release. Copy
-[`templates/workflows/retag.yml`](templates/workflows/retag.yml) only when you
-need a manual `workflow_dispatch` orchestrator (recover a mistag, point custom
-aliases, dry-run a move):
+`semver-cd` force-moves `latest` after each release. Floating `vMAJOR` is
+**manual-only**. Copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
+for a `workflow_dispatch` orchestrator (move `v1`, recover a mistag, custom
+aliases, dry-run):
 
 ```yaml
 # .github/workflows/retag.yml  — see templates/workflows/retag.yml
@@ -58,15 +56,12 @@ jobs:
     name: Retag
     uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
     with:
-      sha: ${{ inputs.sha }}                 # required commit SHA
-      tags: '["latest"]'                     # JSON array; default ["latest"]
-      move-major: true                       # also move vMAJOR from release-tag
-      release-tag: ${{ inputs.release_tag }} # e.g. v1.2.3 (required if move-major)
-      dry-run: true                          # print planned moves only
+      sha: ${{ inputs.sha }}      # required commit SHA
+      tags: '["latest"]'          # or '["v1"]' / '["latest","v1"]'
+      dry-run: true               # print planned moves only
 ```
 
-Caller needs `permissions: contents: write`. Inputs match reusable `retag.yml`
-(`sha`, `tags`, `move-major`, `release-tag`, `dry-run`).
+Caller needs `permissions: contents: write`. Inputs: `sha`, `tags`, `dry-run`.
 
 ### Shared CI + optional post-merge overrides (no consumer expressions)
 

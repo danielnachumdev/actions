@@ -2,7 +2,8 @@
 #   uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 #
 # Caller needs permissions: contents: write
-# Typical tags: latest, vMAJOR (via move-major), or custom names.
+# Moves only the tags listed in `tags` (default: latest).
+# Floating vMAJOR (e.g. v1) is manual — list it explicitly in `tags` when desired.
 
 name: retag
 
@@ -17,14 +18,6 @@ on:
         description: JSON array of tag names to force-move (e.g. '["latest"]')
         type: string
         default: '["latest"]'
-      move-major:
-        description: If true, also derive vMAJOR from release-tag and move it
-        type: boolean
-        default: true
-      release-tag:
-        description: Semver release tag (e.g. v1.2.3); required when move-major is true
-        type: string
-        default: ""
       dry-run:
         description: Print planned moves without tagging or pushing
         type: boolean
@@ -49,8 +42,6 @@ jobs:
         env:
           SHA: ${{ inputs.sha }}
           TAGS_JSON: ${{ inputs.tags || '["latest"]' }}
-          MOVE_MAJOR: ${{ inputs.move-major == true && 'true' || 'false' }}
-          RELEASE_TAG: ${{ inputs.release-tag }}
           DRY_RUN: ${{ inputs.dry-run == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
@@ -76,19 +67,6 @@ jobs:
               print(item.strip())
           ' "${TAGS_JSON}")
 
-          if [[ "${MOVE_MAJOR}" == "true" ]]; then
-            if [[ -z "${RELEASE_TAG}" ]]; then
-              echo "FAIL: release-tag is required when move-major is true"
-              exit 1
-            fi
-            major="$(echo "${RELEASE_TAG}" | sed -E 's/^(v[0-9]+)\..*/\1/')"
-            if [[ ! "${major}" =~ ^v[0-9]+$ ]]; then
-              echo "FAIL: cannot derive vMAJOR from release-tag=${RELEASE_TAG}"
-              exit 1
-            fi
-            tags+=("${major}")
-          fi
-
           # Deduplicate while preserving order
           declare -A seen=()
           unique=()
@@ -100,7 +78,7 @@ jobs:
           done
 
           if [[ ${#unique[@]} -eq 0 ]]; then
-            echo "No tags to move (empty tags and move-major=false)."
+            echo "No tags to move (empty tags)."
             exit 0
           fi
 

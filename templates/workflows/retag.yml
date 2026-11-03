@@ -1,9 +1,9 @@
 name: Retag
 
 # Thin orchestrator for standalone floating-tag moves.
-# Usually unnecessary — semver-cd already calls retag after each release
-# (latest + vMAJOR). Use this when you need to point floating tags at a
-# SHA manually (hotfix, recover a mistagged latest, custom aliases).
+# semver-cd already moves `latest` after each release. Use this when you need
+# to point floating tags at a SHA manually (hotfix, recover a mistagged latest,
+# move vMAJOR, custom aliases). Floating vMAJOR is manual-only.
 # Pin:
 #   uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 #
@@ -17,17 +17,9 @@ on:
         type: string
         required: true
       tags:
-        description: 'JSON array of tag names (e.g. ["latest"])'
+        description: 'JSON array of tag names (e.g. ["latest"] or ["v1"])'
         type: string
         default: '["latest"]'
-      move_major:
-        description: Also move vMAJOR derived from release_tag
-        type: boolean
-        default: true
-      release_tag:
-        description: Semver release tag (e.g. v1.2.3); required when move_major
-        type: string
-        default: ""
       dry_run:
         description: Print planned moves without tagging or pushing
         type: boolean
@@ -43,6 +35,4 @@ jobs:
     with:
       sha: ${{ inputs.sha }}
       tags: ${{ inputs.tags }}
-      move-major: ${{ inputs.move_major }}
-      release-tag: ${{ inputs.release_tag }}
       dry-run: ${{ inputs.dry_run }}

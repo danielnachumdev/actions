@@ -62,7 +62,9 @@ class TestRetagWorkflow:
         inputs = _on(data)["workflow_call"]["inputs"]
         assert inputs["sha"]["required"] is True
         assert inputs["tags"]["default"] == '["latest"]'
-        assert inputs["move-major"]["default"] is True
+        assert "move-major" not in inputs
+        assert "release-tag" not in inputs
+        assert set(inputs) == {"sha", "tags", "dry-run"}
         assert "retag" in data["jobs"]
 
 
@@ -71,12 +73,16 @@ class TestSemverCdWorkflow:
         data = _load("semver-cd.yml")
         inputs = _on(data)["workflow_call"]["inputs"]
         assert inputs["move-latest"]["default"] is True
-        assert inputs["move-major"]["default"] is True
+        assert "move-major" not in inputs
         assert inputs["floating-tags"]["default"] == '["latest"]'
         jobs = data["jobs"]
         assert "retag" in jobs
         assert jobs["retag"]["needs"] == ["semver"]
         assert jobs["retag"]["uses"] == "./.github/workflows/retag.yml"
+        retag_with = jobs["retag"]["with"]
+        assert "move-major" not in retag_with
+        assert "release-tag" not in retag_with
+        assert retag_with["tags"] == "${{ inputs.floating-tags }}"
         # PyPI stays parallel with retag (needs semver only).
         assert jobs["pypi"]["needs"] == ["semver"]
         # Inline major-move step removed from semver job.

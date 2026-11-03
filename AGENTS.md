@@ -13,7 +13,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
 | Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml` (`workflow_call` only; optional PyPI job) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
-| Pinning (consumers) | **`@v1`** (floating major) or **`@latest`** (newest release); prefer `@v1` for stable major contract |
+| Pinning (consumers) | **`@v1`** (floating major, updated manually) or **`@latest`** (CD-moved each release); prefer `@v1` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
@@ -22,7 +22,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 .github/workflows/node.yml       # Node/TS lint+test matrix lane
 .github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
 .github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → retag → optional PyPI
-.github/workflows/retag.yml      # force-move floating tags (latest, vMAJOR, custom)
+.github/workflows/retag.yml      # force-move explicit floating tags (default: latest)
 .github/workflows/check.yml      # dogfood thin CI (name: CI)
 .github/workflows/cd.yml         # dogfood thin CD
 scripts/release/
@@ -71,7 +71,6 @@ jobs:
       sha: ${{ github.event.workflow_run.head_sha }}
       # publish-pypi: true
       # move-latest: true
-      # move-major: true
       # floating-tags: '["latest"]'
     secrets:
       # User repos: map by name (inherit is org/enterprise only). Empty OK for OIDC.
@@ -121,8 +120,7 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 | `publish-pypi` | `false` | Upload release wheel to PyPI |
 | `move-latest` | `true` | Apply `floating-tags` after release |
-| `move-major` | `true` | Force-move floating `vMAJOR` |
-| `floating-tags` | `["latest"]` | Extra floating tags (when `move-latest`) |
+| `floating-tags` | `["latest"]` | Floating tags to force-move (when `move-latest`) |
 
 ### `retag.yml` inputs (standalone or via `semver-cd`)
 
@@ -130,11 +128,9 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | ----- | ------- | ------- |
 | `sha` | required | Commit floating tags should point at |
 | `tags` | `["latest"]` | JSON array of tag names to force-move |
-| `move-major` | `true` | Also move `vMAJOR` derived from `release-tag` |
-| `release-tag` | `""` | e.g. `v1.2.3` (required when `move-major`) |
 | `dry-run` | `false` | Print planned moves only |
 
-Caller needs `permissions: contents: write`.
+Caller needs `permissions: contents: write`. Only moves tags listed in `tags` — no auto-derive of `vMAJOR`. To move `v1`, pass `tags: '["v1"]'` (or include it alongside `latest`) on a deliberate `workflow_dispatch`.
 
 ### `semver-cd.yml` secrets
 
@@ -148,7 +144,7 @@ Callers **must**:
 
 An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
-On a successful release, `semver-cd` calls `retag.yml` to force-move floating tags (`latest` by default + `vMAJOR`) to the release SHA so `@latest` / `@v1` stay current. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
+On a successful release, `semver-cd` calls `retag.yml` to force-move `latest` (or whatever is in `floating-tags`) to the release SHA. Floating `vMAJOR` is **not** auto-moved — update it manually via the retag template / `workflow_dispatch` with an explicit `tags` list. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
 
 ---
 
