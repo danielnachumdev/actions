@@ -312,3 +312,15 @@ class TestDependabotAutoMergeWorkflow:
         assert "dependabot[bot]" in job["if"]
         assert job["permissions"]["contents"] == "write"
         assert job["permissions"]["pull-requests"] == "write"
+
+    def test_howto_requires_needs_gate_last(self):
+        """HOW-TO must require needs: so Dependabot merge runs last (thin + custom)."""
+        howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
+        assert "Gate so merge runs last" in howto
+        assert "**must** declare `needs:`" in howto
+        assert "needs: [ci, semver]" in howto
+        assert "aggregate" in howto.lower()
+        template = (_TEMPLATES / "ci.yml").read_text(encoding="utf-8")
+        assert "aggregate success job" in template
+        reusable = (_WORKFLOWS / "dependabot-auto-merge.yml").read_text(encoding="utf-8")
+        assert "aggregate" in reusable

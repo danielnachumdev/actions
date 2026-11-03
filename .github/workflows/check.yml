@@ -38,6 +38,7 @@ jobs:
       # timeout-minutes: 5
 
   # Opt-in: merge Dependabot PRs after sibling CI jobs pass (dogfood).
+  # needs: gates this last — list every PR job that must succeed first.
   dependabot-auto-merge:
     name: Merge Dependabot PR
     needs: [ci, semver]
