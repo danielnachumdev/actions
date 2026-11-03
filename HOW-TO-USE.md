@@ -33,7 +33,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
 6. Pin `@v1`  
-7. PyPI publishers only (Semver CD): `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
+7. PyPI publishers only (Semver CD): `publish-pypi: true` + Trusted Publisher (or optional `PYPI_API_TOKEN` fallback)  
 8. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
@@ -252,12 +252,16 @@ Default remains **off** (job commented out in the template).
 
 ### Optional PyPI (same wheel as the GitHub Release)
 
-1. Set repo secret **`PYPI_API_TOKEN`** (project-scoped or user upload token for that package).  
-2. Thin `cd.yml`: `publish-pypi: true`, `permissions.id-token: write`, map `PYPI_API_TOKEN` **by name** (see template).  
+CD **prefers Trusted Publishing (OIDC)**, then falls back to `PYPI_API_TOKEN` if OIDC fails. That lets a **new** package publish via a pending Trusted Publisher even when the repo still has a project-scoped token for a different package.
+
+1. On PyPI → Publishing → Trusted Publishers: add a pending publisher for this GitHub repo / `cd.yml` (empty environment).  
+2. Thin `cd.yml`: `publish-pypi: true`, `permissions.id-token: write`, map `PYPI_API_TOKEN` **by name** (see template; empty OK for OIDC-only).  
+3. Optional fallback: repo secret **`PYPI_API_TOKEN`** (project-scoped or user upload token) for packages that already exist and are not on Trusted Publishing.
 
 **Notes (user-owned repos):**
 - Map secrets by name — `secrets: inherit` is org/enterprise-only.
-- Always set `id-token: write` on thin CD — `semver-cd` declares an OIDC-capable PyPI job (validated even when skipped). Token path is what we use today.
+- Always set `id-token: write` on thin CD — `semver-cd` declares an OIDC-capable PyPI job (validated even when skipped).
+- Do **not** rely on a project-scoped token for a package that does not exist yet — use Trusted Publishing for first publish.
 
 Default remains **GitHub Release only** (`publish-pypi: false`). CI auto-detects **Python** and/or **Node**.
 

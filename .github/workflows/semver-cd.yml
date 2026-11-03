@@ -357,10 +357,20 @@ jobs:
           set -euo pipefail
           wheel="$(ls -1 dist/*.whl | head -1)"
           [[ -n "${wheel}" && -f "${wheel}" ]]
+          # Prefer Trusted Publishing so first publish works with a pending
+          # publisher even when an unrelated project-scoped token is present.
+          set +e
+          echo "Publishing ${wheel} with Trusted Publishing (OIDC)"
+          uv publish "${wheel}" --trusted-publishing always
+          status=$?
+          set -e
+          if [[ "${status}" -eq 0 ]]; then
+            exit 0
+          fi
           if [[ -n "${PYPI_TOKEN}" ]]; then
-            echo "Publishing ${wheel} with API token"
+            echo "OIDC publish failed (exit ${status}); falling back to API token"
             uv publish "${wheel}" --token "${PYPI_TOKEN}"
           else
-            echo "Publishing ${wheel} with Trusted Publishing (OIDC)"
-            uv publish "${wheel}" --trusted-publishing always
+            echo "OIDC publish failed (exit ${status}) and no PYPI_API_TOKEN configured" >&2
+            exit "${status}"
           fi

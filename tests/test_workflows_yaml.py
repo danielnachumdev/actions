@@ -247,6 +247,19 @@ class TestSemverCdWorkflow:
             "Checkout caller at SHA"
         )
 
+    def test_pypi_prefers_trusted_publishing_then_token(self):
+        """OIDC first so pending publishers work despite unrelated project tokens."""
+        data = _load("semver-cd.yml")
+        steps = data["jobs"]["pypi"]["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        publish = by_name["Publish to PyPI"]["run"]
+        oidc = publish.index("--trusted-publishing always")
+        token = publish.index("--token")
+        assert oidc < token
+        assert "falling back to API token" in publish
+
 
 class TestDogfoodCdWorkflow:
     def test_opts_into_latest_retags(self):

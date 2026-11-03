@@ -193,7 +193,7 @@ Callers **must**:
 
 An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
-On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.yml` with that list as `tags`. Empty `retags` (`""` or `[]`) skips the retag job. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off** and opts into `retags: '["latest"]'`.
+On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.yml` with that list as `tags`. Empty `retags` (`""` or `[]`) skips the retag job. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish --trusted-publishing always` first; if that fails and `PYPI_API_TOKEN` is set, it falls back to `--token`. This repo’s dogfood `cd.yml` leaves PyPI **off** and opts into `retags: '["latest"]'`.
 
 ---
 
