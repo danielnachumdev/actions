@@ -1,6 +1,8 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
 # After release: optional floating retags via retag.yml when `retags` is non-empty.
-# Optional: publish the same wheel to PyPI (Trusted Publishing or token).
+# Optional: publish the same wheel to PyPI via API token (publish-pypi).
+# Trusted Publishing (OIDC) must be inlined in the caller's cd.yml — PyPI does
+# not support reusable workflows as Trusted Publishers (warehouse#11096).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
 # Allowed labels (from merged PR): noBump | bumpPatch | bumpMinor | bumpMajor
@@ -38,15 +40,11 @@ on:
         type: string
         default: ""
       publish-pypi:
-        description: If true, upload the release wheel to PyPI after GitHub Release
+        description: >-
+          If true, upload the release wheel to PyPI with secrets.PYPI_API_TOKEN
+          (token only). For Trusted Publishing, inline a pypi job in the caller.
         type: boolean
         default: false
-      pypi-auth:
-        description: >-
-          PyPI auth method when publish-pypi is true: trusted-publishing (OIDC)
-          or token (secrets.PYPI_API_TOKEN). Caller chooses; no auto-fallback.
-        type: string
-        default: "trusted-publishing"
       retags:
         description: >-
           JSON array of floating tag names to force-move to the release SHA after
@@ -67,7 +65,7 @@ on:
         default: 10
     secrets:
       PYPI_API_TOKEN:
-        description: PyPI API token when pypi-auth is token (unused for trusted-publishing)
+        description: PyPI API token (required when publish-pypi is true)
         required: false
     outputs:
       skip:
@@ -83,7 +81,6 @@ on:
 permissions:
   contents: write
   pull-requests: read
-  id-token: write
 
 jobs:
   semver:
@@ -322,8 +319,10 @@ jobs:
       dry-run: false
       timeout-minutes: ${{ inputs.retag-timeout-minutes }}
 
-  # Opt-in: same wheel as the GitHub Release → PyPI.
-  # Auth is caller-chosen via pypi-auth (trusted-publishing | token); no auto-fallback.
+  # Opt-in: same wheel as the GitHub Release → PyPI (API token only).
+  # Trusted Publishing cannot use this job: OIDC job_workflow_ref is this reusable
+  # workflow, and PyPI does not support reusable WFs as Trusted Publishers
+  # (warehouse#11096). Callers that need OIDC must inline a pypi job in cd.yml.
   # Runs in parallel with retag (both only need semver).
   pypi:
     name: PyPI
@@ -337,7 +336,6 @@ jobs:
     timeout-minutes: ${{ inputs.pypi-timeout-minutes }}
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
@@ -358,27 +356,15 @@ jobs:
 
       - name: Publish to PyPI
         env:
-          PYPI_AUTH: ${{ inputs.pypi-auth }}
           PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           set -euo pipefail
           wheel="$(ls -1 dist/*.whl | head -1)"
           [[ -n "${wheel}" && -f "${wheel}" ]]
-          case "${PYPI_AUTH}" in
-            trusted-publishing)
-              echo "Publishing ${wheel} with Trusted Publishing (OIDC)"
-              uv publish "${wheel}" --trusted-publishing always
-              ;;
-            token)
-              if [[ -z "${PYPI_TOKEN}" ]]; then
-                echo "pypi-auth=token requires secrets.PYPI_API_TOKEN" >&2
-                exit 1
-              fi
-              echo "Publishing ${wheel} with API token"
-              uv publish "${wheel}" --token "${PYPI_TOKEN}"
-              ;;
-            *)
-              echo "Invalid pypi-auth='${PYPI_AUTH}' (expected trusted-publishing or token)" >&2
-              exit 1
-              ;;
-          esac
+          if [[ -z "${PYPI_TOKEN}" ]]; then
+            echo "publish-pypi requires secrets.PYPI_API_TOKEN (token only in this reusable job)" >&2
+            echo "For Trusted Publishing, inline a pypi job in the caller's cd.yml (warehouse#11096)" >&2
+            exit 1
+          fi
+          echo "Publishing ${wheel} with API token"
+          uv publish "${wheel}" --token "${PYPI_TOKEN}"
