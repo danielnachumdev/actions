@@ -1,0 +1,131 @@
+# SSH to a VPS and run raft apply + optional doctor.
+# Matches the nachum-mealie CD apply-raft pattern (auth test → apply → doctor).
+#
+#   uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+#   with:
+#     service: my-app
+#     git-repo: git@github.com:org/repo.git
+#     ref: ${{ github.sha }}
+#     # host: 192.0.2.10          # or omit and set vars.VPS_HOST
+#     # ssh-user: raft            # or omit; falls back to vars.VPS_USER then raft
+#   secrets:
+#     VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
+name: raft-deploy
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: raft App / compose service name
+        type: string
+        required: true
+      git-repo:
+        description: Git remote URL used by raft (e.g. git@github.com:org/repo.git)
+        type: string
+        required: true
+      ref:
+        description: Deploy ref (commit SHA, tag, or branch tip raft can resolve)
+        type: string
+        required: true
+      host:
+        description: >-
+          VPS hostname or IP. Empty (default) resolves vars.VPS_HOST from the
+          caller repository.
+        type: string
+        required: false
+        default: ""
+      ssh-user:
+        description: >-
+          SSH username. Empty (default) resolves vars.VPS_USER, then raft.
+        type: string
+        required: false
+        default: ""
+      command_timeout:
+        description: appleboy/ssh-action command_timeout (duration string)
+        type: string
+        required: false
+        default: "10m"
+      skip-doctor:
+        description: Skip raft doctor after apply
+        type: boolean
+        required: false
+        default: false
+      timeout-minutes:
+        description: Job timeout (minutes)
+        type: number
+        required: false
+        default: 15
+    secrets:
+      VPS_SSH_KEY:
+        description: SSH private key for the VPS (caller maps secrets.VPS_SSH_KEY)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    name: Apply + Redeploy raft
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Resolve SSH target
+        id: target
+        env:
+          INPUT_HOST: ${{ inputs.host }}
+          INPUT_USER: ${{ inputs.ssh-user }}
+          VAR_HOST: ${{ vars.VPS_HOST }}
+          VAR_USER: ${{ vars.VPS_USER }}
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_KEY}" ]; then
+            echo "::error::Missing secrets.VPS_SSH_KEY (map it on the workflow_call secrets: block)."
+            exit 1
+          fi
+          HOST="${INPUT_HOST:-}"
+          if [ -z "${HOST}" ]; then
+            HOST="${VAR_HOST:-}"
+          fi
+          if [ -z "${HOST}" ]; then
+            echo "::error::Missing VPS host: pass with: host, or set vars.VPS_HOST on the caller repository."
+            exit 1
+          fi
+          USER="${INPUT_USER:-}"
+          if [ -z "${USER}" ]; then
+            USER="${VAR_USER:-raft}"
+          fi
+          echo "host=${HOST}" >> "$GITHUB_OUTPUT"
+          echo "user=${USER}" >> "$GITHUB_OUTPUT"
+          echo "Using SSH ${USER}@${HOST}"
+
+      - name: Apply App + redeploy on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SERVICE: ${{ inputs.service }}
+          REF: ${{ inputs.ref }}
+          GIT_REPO: ${{ inputs.git-repo }}
+          SKIP_DOCTOR: ${{ inputs.skip-doctor }}
+        with:
+          host: ${{ steps.target.outputs.host }}
+          username: ${{ steps.target.outputs.user }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: ${{ inputs.command_timeout }}
+          envs: SERVICE,REF,GIT_REPO,SKIP_DOCTOR
+          script: |
+            set -euo pipefail
+            export PATH="${HOME}/.local/bin:${PATH}"
+            if ! command -v raft >/dev/null 2>&1; then
+              echo "raft is missing on the VM; run install.sh (or uv tool install)" >&2
+              exit 1
+            fi
+            if ! raft auth test "${SERVICE}" --repo "${GIT_REPO}"; then
+              echo "raft auth test failed for ${SERVICE}." >&2
+              echo "On the VPS: raft auth setup ${SERVICE} --repo ${GIT_REPO}" >&2
+              exit 1
+            fi
+            raft apply --git "${GIT_REPO}" --ref "${REF}"
+            if [ "${SKIP_DOCTOR}" != "true" ]; then
+              raft doctor "${SERVICE}"
+            fi

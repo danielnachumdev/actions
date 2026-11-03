@@ -14,7 +14,7 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 | Python | `>=3.11` (CI matrix **3.11, 3.12, 3.13** via reusable `ci.yml` defaults) |
 | Tests | `tests/` — pytest; **never delete** |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml` (`workflow_call` only; optional PyPI job on CD) |
+| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml` (`workflow_call` only; optional PyPI job on CD) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
 | Pinning (consumers) | Prefer **`@v1`**; **`@latest`** only if CD opts into `retags: '["latest"]'` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
@@ -35,10 +35,11 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 │       ├── retag.yml            # force-move explicit floating tags
 │       ├── dependabot-auto-merge.yml
 │       ├── cloudrun-deploy.yml  # WIF → gcloud builds triggers run + stream logs
+│       ├── raft-deploy.yml      # SSH + raft apply / doctor on a VPS
 │       ├── check.yml            # dogfood thin CI (name: CI)
 │       └── cd.yml               # dogfood thin CD
 ├── scripts/release/             # release_semver.py, build_python_uv_wheel.sh
-├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun + CODEOWNERS / Dependabot (@v1)
+├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun/raft-deploy + CODEOWNERS / Dependabot (@v1)
 ├── examples/
 ├── tests/
 ├── pyproject.toml               # test harness (danielnachumdev-actions-tests); not on PyPI
@@ -72,8 +73,8 @@ Config for pytest lives in `pyproject.toml`. Prefer editing floors / deps there 
 
 ### Changing CI / workflows
 
-1. Edit reusable blocks under `.github/workflows/` (`ci.yml`, `python.yml`, `node.yml`, `semver-*.yml`, `retag.yml`, `dependabot-auto-merge.yml`).
-2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@v1` in templates).
+1. Edit reusable blocks under `.github/workflows/` (`ci.yml`, `python.yml`, `node.yml`, `semver-*.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`).
+2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@v1` in templates). Cloud Run and raft deploy are optional (template only; not dogfooded here).
 3. Update [`HOW-TO-USE.md`](HOW-TO-USE.md) + templates when inputs, required check names, or adoption steps change.
 4. Breaking inputs / check names → new **major** tag; update templates + consumers together.
 5. Composite helpers under `.github/actions/` are for **this** repo’s reusable workflows; from `workflow_call`, relative `uses: ./.github/actions/...` resolves to the **caller** — prefer full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).

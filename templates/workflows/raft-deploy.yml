@@ -1,0 +1,50 @@
+name: Raft deploy
+
+# Thin VPS apply/redeploy orchestrator — SSH + raft apply (no Semver / Cloud Run).
+# Prerequisites on the caller repo (or org):
+#   vars.VPS_HOST          (or pass with.host)
+#   vars.VPS_USER          (optional; default raft)
+#   secrets.VPS_SSH_KEY
+# Pin:
+#   uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Deploy ref (empty = current GITHUB_SHA)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: raft-deploy-${{ github.event.workflow_run.head_sha || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Raft apply
+    if: >
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
+    uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+    with:
+      service: my-app
+      git-repo: git@github.com:org/repo.git
+      ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.ref != '' && github.event.inputs.ref || github.sha) }}
+      # host: ${{ vars.VPS_HOST }}   # optional; omit to resolve vars.VPS_HOST inside reusable
+      # ssh-user: raft
+      # command_timeout: 10m
+      # skip-doctor: false
+      # timeout-minutes: 15
+    secrets:
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
