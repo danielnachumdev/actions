@@ -20,6 +20,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 1. Copy [`templates/workflows/ci.yml`](templates/workflows/ci.yml) + [`cd.yml`](templates/workflows/cd.yml)  
 2. Copy [`templates/github/`](templates/github/) CODEOWNERS + dependabot  
 3. Create labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
+   - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`** for pip / npm / github-actions) only apply if those labels **already exist** on the repo. Without `noBump`, Semver CI fails on Dependabot PRs.  
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** if using CD); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
 6. Pin `@v1`  
