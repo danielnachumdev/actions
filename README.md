@@ -18,7 +18,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
 - **Opt-in floating tags** — pass `retags: '["latest"]'` on CD; prefer **`@v1`** pins
-- **Opt-in PyPI** — same release wheel; caller picks `pypi-auth: trusted-publishing` or `token`
+- **Opt-in PyPI** — same release wheel; **token** via `semver-cd`, or **Trusted Publishing** inlined in the caller’s `cd.yml` (OIDC cannot use the reusable PyPI job — [warehouse#11096](https://github.com/pypi/warehouse/issues/11096))
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
 ## Sixty-second start

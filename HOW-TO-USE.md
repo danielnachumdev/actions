@@ -33,7 +33,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
 6. Pin `@v1`  
-7. PyPI publishers only (Semver CD): `publish-pypi: true` + choose `pypi-auth` (`trusted-publishing` or `token`)  
+7. PyPI publishers only (Semver CD): **token** → `publish-pypi: true` + `pypi-auth: token`; **Trusted Publishing** → keep `publish-pypi: false` and add an **inline** `pypi` job in thin `cd.yml` (see below — not via the reusable PyPI job)  
 8. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
@@ -252,20 +252,59 @@ Default remains **off** (job commented out in the template).
 
 ### Optional PyPI (same wheel as the GitHub Release)
 
-The consuming repo chooses the auth method with **`pypi-auth`** (no auto-fallback between them):
+Two supported paths — pick **one**. Do **not** expect Trusted Publishing to work from `semver-cd`’s built-in PyPI job.
 
-| `pypi-auth` | Setup |
-| --- | --- |
-| `trusted-publishing` (default) | PyPI Trusted Publisher for this GitHub repo / `cd.yml` (pending OK for a new package). Token secret unused. |
-| `token` | Repo secret **`PYPI_API_TOKEN`** (project-scoped or user upload token). |
+| Method | Where it runs | Setup |
+| --- | --- | --- |
+| **API token** (supported **inside** `semver-cd`) | Reusable PyPI job | `publish-pypi: true`, `pypi-auth: token`, repo secret **`PYPI_API_TOKEN`** |
+| **Trusted Publishing** (OIDC) | **Caller-inlined** job in thin `cd.yml` only | `publish-pypi: false` on the reusable call; add an inline `pypi` job that downloads the release wheel and runs `uv publish --trusted-publishing always`. Configure the PyPI Trusted Publisher for this repo’s **`cd.yml`**. |
 
-1. Thin `cd.yml`: `publish-pypi: true`, `pypi-auth: trusted-publishing` **or** `token`, `permissions.id-token: write`, map `PYPI_API_TOKEN` **by name** (see template; empty OK when using Trusted Publishing).  
-2. Match PyPI setup to that choice (Trusted Publisher **or** API token — not both-as-fallback).
+**Why Trusted Publishing cannot use the reusable job:** PyPI matches GitHub OIDC claims. For jobs inside a `workflow_call`, `job_workflow_ref` points at the **reusable** workflow (`…/semver-cd.yml@…`), not the consumer’s `cd.yml`. PyPI does **not** support reusable workflows as Trusted Publishers ([troubleshooting](https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github); [warehouse#11096](https://github.com/pypi/warehouse/issues/11096), open). So `pypi-auth: trusted-publishing` on `semver-cd` **will fail** publisher match against a pending/normal publisher configured for the consumer’s `cd.yml` — by PyPI design, not a temporary quirk of this repo. Prefer `pypi-auth: token` for in-reusable publish, or inline OIDC as below.
+
+**Trusted Publishing sketch** (inline in thin `cd.yml`; see also [google-photos-sdk#21](https://github.com/danielnachumdev/google-photos-sdk/pull/21)):
+
+```yaml
+jobs:
+  semver:
+    name: Semver
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    with:
+      sha: ${{ github.event.workflow_run.head_sha }}
+      publish-pypi: false   # OIDC must not run inside the reusable WF
+  pypi:
+    name: PyPI
+    needs: [semver]
+    if: needs.semver.outputs.skip != 'true' && needs.semver.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.13"
+          ignore-empty-workdir: true
+      - name: Download wheel from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.semver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "${TAG}" --dir dist --pattern '*.whl'
+      - name: Publish to PyPI (Trusted Publishing)
+        run: |
+          set -euo pipefail
+          wheel="$(ls -1 dist/*.whl | head -1)"
+          uv publish "${wheel}" --trusted-publishing always
+```
+
+**Token path** (in-reusable): `publish-pypi: true`, `pypi-auth: token`, map `PYPI_API_TOKEN` **by name** (see template).
 
 **Notes (user-owned repos):**
 - Map secrets by name — `secrets: inherit` is org/enterprise-only.
 - Always set `id-token: write` on thin CD — `semver-cd` declares an OIDC-capable PyPI job (validated even when skipped).
-- A project-scoped token cannot create a package that does not exist yet — use `pypi-auth: trusted-publishing` for that case.
+- A project-scoped token cannot create a package that does not exist yet — use **caller-inlined** Trusted Publishing for first publish.
 
 Default remains **GitHub Release only** (`publish-pypi: false`). CI auto-detects **Python** and/or **Node**.
 

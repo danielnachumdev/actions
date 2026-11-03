@@ -4,8 +4,14 @@ name: CD
 # (releases/tags/wheels). Apps/sites/infra: omit this file; deploy another way.
 # Semver at CD = bump → wheel → GitHub Release → optional retags (or skip on
 # noBump). Pass retags to force-move floating tags (e.g. latest).
-# Optional PyPI:
-#   publish-pypi: true  +  pypi-auth: trusted-publishing|token  +  id-token: write
+#
+# Optional PyPI (pick one):
+#   Token (in-reusable): publish-pypi: true + pypi-auth: token + PYPI_API_TOKEN
+#   Trusted Publishing: keep publish-pypi: false; add an INLINE pypi job in THIS
+#     file (OIDC job_workflow_ref must be this cd.yml). PyPI does not support
+#     reusable workflows as Trusted Publishers (warehouse#11096) — so
+#     pypi-auth: trusted-publishing on semver-cd will NOT match a publisher
+#     configured for this repo's cd.yml.
 # Pin:
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 
@@ -31,7 +37,8 @@ permissions:
   contents: write
   pull-requests: read
   actions: read
-  # Required when publish-pypi: true (Trusted Publishing / OIDC):
+  # Required by semver-cd (PyPI job declares OIDC even when skipped) and by
+  # an inline Trusted Publishing job:
   id-token: write
 
 concurrency:
@@ -54,13 +61,51 @@ jobs:
       sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
       # Opt-in: force-move floating latest after each real release (omit/""/[] = no-op).
       retags: '["latest"]'
+      # --- Token path (supported inside semver-cd) ---
       # publish-pypi: true
-      # pypi-auth: trusted-publishing  # or token (requires PYPI_API_TOKEN)
+      # pypi-auth: token
+      # --- Trusted Publishing: leave publish-pypi false; uncomment inline job below ---
+      # publish-pypi: false
       # Timeouts (minutes; defaults preserve prior hardcodes):
       # timeout-minutes: 30          # bump / build / release
       # pypi-timeout-minutes: 15
       # retag-timeout-minutes: 10
     # User-owned repos: pass secrets by name (secrets: inherit is org/enterprise only).
-    # Required whenever semver-cd declares secrets: — empty token is OK for trusted-publishing.
+    # Required whenever semver-cd declares secrets: — needed for pypi-auth: token.
     secrets:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+
+  # --- Optional: Trusted Publishing (caller-inlined; OIDC claims use THIS cd.yml) ---
+  # pypi:
+  #   name: PyPI
+  #   needs: [semver]
+  #   if: >
+  #     needs.semver.outputs.skip != 'true' &&
+  #     needs.semver.outputs.tag != '' &&
+  #     !(github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true')
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 15
+  #   permissions:
+  #     contents: read
+  #     id-token: write
+  #   steps:
+  #     - uses: astral-sh/setup-uv@v10.3.3
+  #       with:
+  #         python-version: "3.13"
+  #         ignore-empty-workdir: true
+  #     - name: Download wheel from GitHub Release
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
+  #         TAG: ${{ needs.semver.outputs.tag }}
+  #         REPO: ${{ github.repository }}
+  #       run: |
+  #         set -euo pipefail
+  #         mkdir -p dist
+  #         gh release download "${TAG}" --repo "${REPO}" --dir dist --pattern '*.whl'
+  #         wheel="$(ls -1 dist/*.whl | head -1)"
+  #         [[ -n "${wheel}" && -f "${wheel}" ]]
+  #     - name: Publish to PyPI (Trusted Publishing)
+  #       run: |
+  #         set -euo pipefail
+  #         wheel="$(ls -1 dist/*.whl | head -1)"
+  #         uv publish "${wheel}" --trusted-publishing always

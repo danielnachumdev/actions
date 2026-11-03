@@ -1,6 +1,8 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
 # After release: optional floating retags via retag.yml when `retags` is non-empty.
-# Optional: publish the same wheel to PyPI (Trusted Publishing or token).
+# Optional PyPI: token auth via this reusable job (pypi-auth: token), or
+# Trusted Publishing inlined in the caller's cd.yml (not here — see comments
+# on the pypi job / HOW-TO-USE.md; warehouse#11096).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
 # Allowed labels (from merged PR): noBump | bumpPatch | bumpMinor | bumpMajor
@@ -43,8 +45,12 @@ on:
         default: false
       pypi-auth:
         description: >-
-          PyPI auth method when publish-pypi is true: trusted-publishing (OIDC)
-          or token (secrets.PYPI_API_TOKEN). Caller chooses; no auto-fallback.
+          PyPI auth when publish-pypi is true. Prefer token (PYPI_API_TOKEN) —
+          that is the supported path inside this reusable workflow.
+          trusted-publishing runs OIDC here, so job_workflow_ref is this
+          reusable WF; PyPI will not match a Trusted Publisher configured for
+          the caller's cd.yml (warehouse#11096). For OIDC, inline publish in
+          the caller instead. No auto-fallback.
         type: string
         default: "trusted-publishing"
       retags:
@@ -67,7 +73,7 @@ on:
         default: 10
     secrets:
       PYPI_API_TOKEN:
-        description: PyPI API token when pypi-auth is token (unused for trusted-publishing)
+        description: PyPI API token when pypi-auth is token (unused when PyPI-off or OIDC is caller-inlined)
         required: false
     outputs:
       skip:
@@ -323,7 +329,13 @@ jobs:
       timeout-minutes: ${{ inputs.retag-timeout-minutes }}
 
   # Opt-in: same wheel as the GitHub Release → PyPI.
-  # Auth is caller-chosen via pypi-auth (trusted-publishing | token); no auto-fallback.
+  # Supported auth inside this reusable workflow: pypi-auth: token.
+  # Trusted Publishing against a publisher configured for the consumer's cd.yml
+  # will NOT match: OIDC job_workflow_ref points at this reusable workflow
+  # (…/semver-cd.yml@…), and PyPI does not support reusable workflows as
+  # Trusted Publishers (https://github.com/pypi/warehouse/issues/11096;
+  # https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github).
+  # For OIDC, set publish-pypi: false and inline a pypi job in the caller's cd.yml.
   # Runs in parallel with retag (both only need semver).
   pypi:
     name: PyPI
