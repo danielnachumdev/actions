@@ -64,7 +64,9 @@ jobs:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}
       # publish-pypi: true
-    secrets: inherit  # required (workflow declares secrets); token optional
+    secrets:
+      # User repos: map by name (inherit is org/enterprise only). Empty OK for OIDC.
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 ```
 
 Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
@@ -99,7 +101,7 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | ------ | -------- | ------- |
 | `PYPI_API_TOKEN` | no | Token fallback; omit when using Trusted Publishing only |
 
-Callers **must** pass `secrets: inherit` (or map `PYPI_API_TOKEN`) whenever they call `semver-cd` — GitHub startup-fails the caller if a reusable workflow declares `secrets:` and the caller omits them.
+Callers **must** pass `secrets:` whenever they call `semver-cd` (it declares `PYPI_API_TOKEN`). On **user-owned** repos use an explicit map; `secrets: inherit` is org/enterprise-only and causes `startup_failure` here. An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
 On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current. When `publish-pypi: true`, a follow-up **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
 
