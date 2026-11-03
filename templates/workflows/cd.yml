@@ -11,6 +11,9 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+    # Defense in depth with the job if: (push + main). Limits which CI
+    # completions even enqueue this privileged orchestrator.
+    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:

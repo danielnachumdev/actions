@@ -92,12 +92,40 @@ jobs:
       tag: ${{ steps.final.outputs.tag }}
       version: ${{ steps.final.outputs.version }}
     steps:
+      # Privileged callers (workflow_run) must only release main-line SHAs.
+      # Guard before checkout so a bad dispatch never materializes the tree.
+      # Release/API steps use GH_TOKEN; persist-credentials stays false so a
+      # compromised build cannot reuse the job token from .git/config.
+      - name: Guard release SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${SHA}" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "FAIL: sha must be a git commit SHA, got: ${SHA}"
+            exit 1
+          fi
+          # identical = tip of main; behind = ancestor of main.
+          status="$(gh api "repos/${REPO}/compare/main...${SHA}" --jq .status)"
+          case "${status}" in
+            identical|behind)
+              echo "SHA ${SHA} is on main (${status})"
+              ;;
+            *)
+              echo "FAIL: ${SHA} is not on main (compare status=${status})"
+              exit 1
+              ;;
+          esac
+
       - name: Checkout caller at SHA
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
 
       - name: Checkout standards
         uses: actions/checkout@v7
@@ -105,6 +133,7 @@ jobs:
           repository: danielnachumdev/actions
           ref: ${{ inputs.standards-ref }}
           path: .actions-standards
+          persist-credentials: false
 
       - name: Skip if commit already released
         id: already
