@@ -1,9 +1,15 @@
-# Opt-in Dependabot auto-merge. Call from the thin CI orchestrator via
-# workflow_call. Requires repo "Allow auto-merge" and job-level
-# contents/pull-requests write on the caller.
+# Opt-in Dependabot merge. Call from the thin CI orchestrator via workflow_call
+# after sibling PR jobs have passed. The caller must needs: every job that must
+# succeed first so this runs last (e.g. needs: [ci, semver]). Job-level
+# contents/pull-requests write required on the caller.
+#
+# If branch protection requires checks that are not sibling jobs in the same
+# workflow, those still must be green before merge can succeed — represent them
+# via needs: or keep them out of required checks for Dependabot.
 #
 #   dependabot-auto-merge:
-#     name: Dependabot auto-merge
+#     name: Merge Dependabot PR
+#     needs: [ci, semver]
 #     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
 #     permissions:
 #       contents: write
@@ -21,16 +27,16 @@ permissions:
 
 jobs:
   merge:
-    name: Enable auto-merge
+    name: Merge
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Caller should already gate on dependabot[bot]; keep a defense-in-depth check.
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
-      - name: Enable auto-merge
+      - name: Merge Dependabot PR
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh pr merge --auto --squash "$PR_URL"
+          gh pr merge --squash --delete-branch "$PR_URL"

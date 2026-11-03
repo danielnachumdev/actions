@@ -29,7 +29,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 3. Create labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
    - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`** for pip / npm / github-actions) only apply if those labels **already exist** on the repo. Without `noBump`, Semver CI fails on Dependabot PRs.  
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** if using CD); CODEOWNERS `@you`; required review; admin bypass OK  
-5. Enable Security settings (see below) — Dependabot opens PRs; optionally auto-merge (below)  
+5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
 6. Pin `@v1`  
 7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
 8. Floating tags: pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
@@ -40,7 +40,7 @@ uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 # optional standalone floating-tag mover:
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
-# optional Dependabot auto-merge (from thin CI — see below):
+# optional Dependabot merge after CI (from thin CI — see below):
 uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 ```
 
@@ -161,13 +161,16 @@ EOF
 
 Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-alerts HTTP **204**.
 
-### Dependabot auto-merge (optional opt-in)
+### Dependabot merge after CI (optional opt-in)
 
-Optional job on the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)):
+Optional job on the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)). It **merges** the Dependabot PR (squash + delete branch) once sibling jobs have already passed — it does not enable GitHub’s “Allow auto-merge” queue.
+
+**Consumers must** set `needs:` to every PR job that must pass first so this job runs last:
 
 ```yaml
 dependabot-auto-merge:
-  name: Dependabot auto-merge
+  name: Merge Dependabot PR
+  needs: [ci, semver]
   if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
   permissions:
     contents: write
@@ -177,8 +180,9 @@ dependabot-auto-merge:
 
 Also:
 
-1. Enable **Allow auto-merge** on the consuming repo (`gh api repos/OWNER/REPO -X PATCH -f allow_auto_merge=true`).
+1. Job-level `contents: write` and `pull-requests: write` (shown above) so `GITHUB_TOKEN` can merge.
 2. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
+3. If branch protection requires checks that are **not** sibling jobs in this workflow, either add them to `needs:` or they can still block the merge.
 
 Default remains **off** (job commented out in the template).
 
