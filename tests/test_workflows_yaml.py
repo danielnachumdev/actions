@@ -357,6 +357,79 @@ class TestRaftDeployWorkflow:
         assert "vars.VPS_HOST" in howto
 
 
+class TestCloudrunDeployWorkflow:
+    def test_parses_and_requires_core_inputs(self):
+        data = _load("cloudrun-deploy.yml")
+        assert "workflow_call" in _on(data)
+        inputs = _on(data)["workflow_call"]["inputs"]
+        for key in (
+            "workload_identity_provider",
+            "service_account",
+            "gcp_project",
+            "trigger",
+            "sha",
+        ):
+            assert inputs[key]["required"] is True, key
+        assert inputs["trigger_region"]["default"] == ""
+        assert set(inputs) == {
+            "workload_identity_provider",
+            "service_account",
+            "gcp_project",
+            "trigger",
+            "sha",
+            "trigger_region",
+            "timeout-minutes",
+        }
+        perms = data["permissions"]
+        assert perms["id-token"] == "write"
+        assert perms["contents"] == "read"
+        jobs = data["jobs"]
+        assert "deploy" in jobs
+        steps = jobs["deploy"]["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        assert "Authenticate to Google Cloud" in by_name
+        assert by_name["Authenticate to Google Cloud"]["uses"].startswith(
+            "google-github-actions/auth@"
+        )
+        assert by_name["Set up Cloud SDK"]["uses"].startswith(
+            "google-github-actions/setup-gcloud@"
+        )
+        run = by_name["Run Cloud Build deploy trigger"]["run"]
+        assert "gcloud builds triggers run" in run
+        assert "gcloud builds log" in run
+        assert "--stream" in run
+        assert "--sha=" in run
+
+    def test_timeout_input_wired(self):
+        data = _load("cloudrun-deploy.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes")
+        assert inputs["timeout-minutes"]["default"] == 45
+        _assert_job_timeout_wired(data["jobs"]["deploy"], "timeout-minutes")
+
+    def test_template_pins_v1_and_documents_permissions(self):
+        text = (_TEMPLATES / "cloudrun-deploy.yml").read_text(encoding="utf-8")
+        assert "cloudrun-deploy.yml@v1" in text
+        assert "id-token: write" in text
+        data = _load("cloudrun-deploy.yml", templates=True)
+        job = data["jobs"]["deploy"]
+        assert job["uses"].endswith("cloudrun-deploy.yml@v1")
+        assert "sha" in job["with"]
+        assert "workload_identity_provider" in job["with"]
+        assert "service_account" in job["with"]
+        assert "gcp_project" in job["with"]
+        assert "trigger" in job["with"]
+
+    def test_howto_documents_wif_caveat(self):
+        howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
+        assert "cloudrun-deploy.yml@v1" in howto
+        assert "job_workflow_ref" in howto
+        assert "attribute.repository" in howto
+
+
+
 class TestDependabotAutoMergeWorkflow:
     def test_is_reusable_workflow_call(self):
         data = _load("dependabot-auto-merge.yml")
