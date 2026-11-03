@@ -6,10 +6,11 @@ import yaml
 
 _ROOT = Path(__file__).resolve().parents[1]
 _WORKFLOWS = _ROOT / ".github" / "workflows"
+_TEMPLATES = _ROOT / "templates" / "workflows"
 
 
-def _load(name: str) -> dict:
-    path = _WORKFLOWS / name
+def _load(name: str, *, templates: bool = False) -> dict:
+    path = (_TEMPLATES if templates else _WORKFLOWS) / name
     with path.open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
     assert isinstance(data, dict), name
@@ -177,6 +178,28 @@ class TestSemverCdWorkflow:
         _assert_job_timeout_wired(jobs["pypi"], "pypi-timeout-minutes")
         _assert_with_timeout_wired(jobs["retag"]["with"], "retag-timeout-minutes")
 
+    def test_hardens_privileged_sha_checkout(self):
+        """workflow_run CD may call this; checkout must not persist write creds."""
+        data = _load("semver-cd.yml")
+        steps = data["jobs"]["semver"]["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        assert "Guard release SHA" in by_name
+        guard_run = by_name["Guard release SHA"]["run"]
+        assert "compare/main..." in guard_run
+        assert "identical|behind" in guard_run
+        caller = by_name["Checkout caller at SHA"]
+        assert caller["with"]["ref"] == "${{ inputs.sha }}"
+        assert caller["with"]["persist-credentials"] is False
+        standards = by_name["Checkout standards"]
+        assert standards["with"]["persist-credentials"] is False
+        # Guard runs before any checkout of inputs.sha.
+        names = [s.get("name", "") for s in steps if isinstance(s, dict)]
+        assert names.index("Guard release SHA") < names.index(
+            "Checkout caller at SHA"
+        )
+
 
 class TestDogfoodCdWorkflow:
     def test_opts_into_latest_retags(self):
@@ -187,3 +210,18 @@ class TestDogfoodCdWorkflow:
         assert with_block["retags"] == '["latest"]'
         assert "move-latest" not in with_block
         assert "floating-tags" not in with_block
+
+    def test_workflow_run_limited_to_main(self):
+        data = _load("cd.yml")
+        trigger = _on(data)["workflow_run"]
+        assert trigger["branches"] == ["main"]
+        job_if = data["jobs"]["semver"]["if"]
+        assert "workflow_run.event == 'push'" in job_if
+        assert "head_branch == 'main'" in job_if
+
+    def test_template_cd_matches_dogfood_workflow_run_guard(self):
+        data = _load("cd.yml", templates=True)
+        assert _on(data)["workflow_run"]["branches"] == ["main"]
+        job_if = data["jobs"]["semver"]["if"]
+        assert "workflow_run.event == 'push'" in job_if
+        assert "head_branch == 'main'" in job_if
