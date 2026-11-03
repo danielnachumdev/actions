@@ -1,0 +1,152 @@
+# Terraform fmt + init + plan; apply post-merge by default.
+#   uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+#
+# Behavior (no consumer event_name expressions required):
+#   - Always: checkout → WIF auth → setup-terraform → fmt → init → plan
+#   - Apply after a successful plan when:
+#       apply: true, OR
+#       workflow_dispatch, OR
+#       push and skip-apply-push is false (default)
+#   - pull_request stays plan-only unless apply: true
+#
+# Caller needs permissions:
+#   id-token: write   # Workload Identity Federation (OIDC)
+#   contents: read
+#
+# WIF note: GCP pools usually bind attribute.repository (the *calling* repo).
+# Unlike PyPI Trusted Publishing, you typically do not pin job_workflow_ref to
+# this reusable file; condition on the consumer repo (and optional ref).
+
+name: terraform
+
+on:
+  workflow_call:
+    inputs:
+      workload_identity_provider:
+        description: Full resource name of the WIF provider
+        type: string
+        required: true
+      service_account:
+        description: GCP service account email to impersonate
+        type: string
+        required: true
+      working-directory:
+        description: Directory containing the Terraform root module
+        type: string
+        required: false
+        default: terraform
+      terraform-version:
+        description: Terraform CLI version for hashicorp/setup-terraform
+        type: string
+        required: false
+        default: "1.9.8"
+      ref:
+        description: >-
+          Git ref to checkout (commit SHA, tag, or branch). Empty (default)
+          uses the calling workflow's default checkout ref.
+        type: string
+        required: false
+        default: ""
+      init-args:
+        description: Extra args appended to terraform init -input=false
+        type: string
+        required: false
+        default: ""
+      plan-args:
+        description: Extra args appended to terraform plan
+        type: string
+        required: false
+        default: ""
+      apply:
+        description: Force terraform apply even on pull_request
+        type: boolean
+        required: false
+        default: false
+      skip-apply-push:
+        description: >-
+          When true, push events stay plan-only. workflow_dispatch still
+          applies (unless you omit dispatch from the thin orchestrator).
+        type: boolean
+        required: false
+        default: false
+      skip-fmt:
+        description: Skip terraform fmt -check -recursive
+        type: boolean
+        required: false
+        default: false
+      timeout-minutes:
+        description: Job timeout for Terraform (minutes)
+        type: number
+        required: false
+        default: 30
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Checkout
+        if: inputs.ref == ''
+        uses: actions/checkout@v7
+
+      - name: Checkout at ref
+        if: inputs.ref != ''
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.workload_identity_provider }}
+          service_account: ${{ inputs.service_account }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        if: ${{ !inputs.skip-fmt }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        env:
+          INIT_ARGS: ${{ inputs.init-args }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          terraform init -input=false ${INIT_ARGS}
+
+      - name: Terraform plan
+        id: plan
+        env:
+          PLAN_ARGS: ${{ inputs.plan-args }}
+          DO_APPLY: ${{ inputs.apply || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !inputs.skip-apply-push) }}
+        run: |
+          set -euo pipefail
+          if [ "${DO_APPLY}" = "true" ]; then
+            # shellcheck disable=SC2086
+            terraform plan -no-color -input=false -out=tfplan ${PLAN_ARGS}
+          else
+            # shellcheck disable=SC2086
+            terraform plan -no-color -input=false ${PLAN_ARGS}
+          fi
+
+      - name: Terraform apply
+        if: >-
+          inputs.apply
+          || github.event_name == 'workflow_dispatch'
+          || (github.event_name == 'push' && !inputs.skip-apply-push)
+        run: terraform apply -auto-approve -input=false tfplan

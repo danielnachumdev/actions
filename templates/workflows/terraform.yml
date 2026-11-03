@@ -1,0 +1,39 @@
+name: Terraform
+
+# Thin orchestrator: plan on every PR; plan+apply on push / workflow_dispatch.
+# Pin:
+#   uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+#
+# Caller needs permissions:
+#   id-token: write
+#   contents: read
+#
+# Optional CD gate (plan-only on push until ready):
+#   skip-apply-push: ${{ vars.ENABLE_GHA_CD != 'true' }}
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: Terraform
+    uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+    with:
+      workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+      service_account: terraform-sa@PROJECT_ID.iam.gserviceaccount.com
+      # working-directory: terraform
+      # terraform-version: "1.9.8"
+      # skip-apply-push: false   # true → plan-only on push; dispatch still applies
+      # skip-fmt: false
+      # timeout-minutes: 30
