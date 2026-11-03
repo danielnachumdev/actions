@@ -12,6 +12,12 @@
 # workflows scope on that token). Those merges are skipped with a notice so the
 # job stays green; merge them manually (or with a PAT outside this workflow).
 #
+# Before merge, this workflow compares the PR's current headRefOid to
+# github.sha. If Dependabot force-pushed / rebased while this run was still
+# pending, HEAD has moved — we exit 0 and skip merge so a newer CI run wins.
+# Sibling needs: alone is not enough: gh pr merge targets current HEAD, not
+# the SHA that this workflow run tested.
+#
 # If branch protection requires checks that are not sibling jobs in the same
 # workflow, those still must be green before merge can succeed — represent them
 # via needs: or keep them out of required checks for Dependabot.
@@ -50,6 +56,11 @@ jobs:
           set -euo pipefail
           if gh pr diff "$PR_URL" --name-only | grep -q '^\.github/workflows/'; then
             echo "::notice::Skipping merge: PR updates workflow files; GITHUB_TOKEN cannot merge those changes. Merge manually."
+            exit 0
+          fi
+          HEAD="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
+          if [ "$HEAD" != "$GITHUB_SHA" ]; then
+            echo "PR HEAD moved ($HEAD != $GITHUB_SHA); skipping merge so newer CI can win."
             exit 0
           fi
           gh pr merge --squash --delete-branch "$PR_URL"
