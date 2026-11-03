@@ -1,5 +1,5 @@
-# Opt-in Dependabot auto-merge. Call from the thin CI orchestrator (not a
-# standalone consumer workflow). Requires repo "Allow auto-merge" and job-level
+# Opt-in Dependabot auto-merge. Call from the thin CI orchestrator via
+# workflow_call. Requires repo "Allow auto-merge" and job-level
 # contents/pull-requests write on the caller.
 #
 #   dependabot-auto-merge:
