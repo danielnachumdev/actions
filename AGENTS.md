@@ -13,7 +13,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
 | Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml` (`workflow_call` only; optional PyPI job) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
-| Pinning (consumers) | **`@v1`** (stable major contract) or **`@latest`** (CD-moved each release); prefer `@v1` |
+| Pinning (consumers) | Prefer **`@v1`**; **`@latest`** only if CD opts into `retags: '["latest"]'` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
@@ -21,7 +21,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 .github/workflows/python.yml     # uv pytest matrix lane
 .github/workflows/node.yml       # Node/TS lint+test matrix lane
 .github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
-.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → retag → optional PyPI
+.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → optional retag → optional PyPI
 .github/workflows/retag.yml      # force-move explicit floating tags (default: latest)
 .github/workflows/check.yml      # dogfood thin CI (name: CI)
 .github/workflows/cd.yml         # dogfood thin CD
@@ -70,8 +70,8 @@ jobs:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}
       # publish-pypi: true
-      # move-latest: true
-      # floating-tags: '["latest"]'
+      # Opt-in floating tags (empty/omit = no retag job):
+      retags: '["latest"]'
     secrets:
       # User repos: map by name (inherit is org/enterprise only). Empty OK for OIDC.
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -119,8 +119,7 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 | `publish-pypi` | `false` | Upload release wheel to PyPI |
-| `move-latest` | `true` | Apply `floating-tags` after release |
-| `floating-tags` | `["latest"]` | Floating tags to force-move (when `move-latest`) |
+| `retags` | `""` | JSON array of floating tags to force-move after release; `""` / `[]` = no-op |
 
 ### `retag.yml` inputs (standalone or via `semver-cd`)
 
@@ -144,7 +143,7 @@ Callers **must**:
 
 An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
-On a successful release, `semver-cd` calls `retag.yml` to force-move `latest` (or whatever is in `floating-tags`) to the release SHA. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
+On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.yml` with that list as `tags`. Empty `retags` (`""` or `[]`) skips the retag job. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off** and opts into `retags: '["latest"]'`.
 
 ---
 

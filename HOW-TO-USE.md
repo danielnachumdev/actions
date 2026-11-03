@@ -13,14 +13,14 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 | Pin | Meaning |
 | --- | ------- |
 | **`@v1`** | Stable major contract. **Prefer this.** |
-| **`@latest`** | Newest successful release SHA (any major). Force-moved by CD after each release. |
+| **`@latest`** | Newest successful release SHA when CD opts into `retags: '["latest"]'`. |
 
 ## Semver (one feature, two stages)
 
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
 | **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → floating `latest` → optional PyPI |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → optional `retags` → optional PyPI |
 
 ## Wire-up
 
@@ -32,7 +32,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
 6. Pin `@v1`  
 7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
-8. Optional standalone retag: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) (CD already moves `latest`)
+8. Floating tags: pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
@@ -42,12 +42,24 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 ```
 
+### Opt-in floating retags (CD)
+
+`semver-cd` does **not** move floating tags unless `retags` is a non-empty JSON
+array. Pass the list you want force-moved to the release SHA (this repo and the
+CD template opt into `latest`):
+
+```yaml
+# in thin cd.yml → semver-cd
+with:
+  sha: ${{ github.event.workflow_run.head_sha }}
+  retags: '["latest"]'   # omit / "" / [] → skip retag job
+```
+
 ### Optional standalone retag
 
-`semver-cd` force-moves tags in `floating-tags` (default `latest`) after each
-release. Copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
-for a `workflow_dispatch` orchestrator that force-moves an explicit `tags` list
-to a SHA (recoveries, custom aliases, dry-run):
+Copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) for a
+`workflow_dispatch` orchestrator that force-moves an explicit `tags` list to a
+SHA (recoveries, custom aliases, dry-run):
 
 ```yaml
 # .github/workflows/retag.yml  — see templates/workflows/retag.yml

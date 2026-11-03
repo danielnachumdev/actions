@@ -1,7 +1,7 @@
 name: CD
 
 # Dogfood orchestrator — same shape as templates/workflows/cd.yml, relative `./`.
-# Semver at CD: bump → wheel → GitHub Release (+ floating latest) or skip on noBump.
+# Semver at CD: bump → wheel → GitHub Release (+ opt-in retags) or skip on noBump.
 
 on:
   workflow_run:
@@ -43,6 +43,8 @@ jobs:
       standards-ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
       sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
+      # Opt-in: force-move floating latest after each real release.
+      retags: '["latest"]'
       # publish-pypi stays false (this repo is not a PyPI package).
     # User-owned repos cannot use secrets: inherit — pass by name (may be empty).
     secrets:

@@ -1,8 +1,8 @@
 name: Retag
 
-# Thin orchestrator for standalone floating-tag moves.
-# semver-cd already moves `latest` after each release. Use this to retag an
-# explicit `tags` list to a SHA (recoveries, custom aliases, dry-run).
+# Thin orchestrator for standalone floating-tag moves via workflow_dispatch.
+# Use this to force-move an explicit `tags` list to a SHA (recoveries, custom
+# aliases, dry-run). For CD-time moves, pass `retags` on semver-cd instead.
 # Pin:
 #   uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 #

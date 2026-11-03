@@ -72,19 +72,35 @@ class TestSemverCdWorkflow:
     def test_parses_and_wires_retag(self):
         data = _load("semver-cd.yml")
         inputs = _on(data)["workflow_call"]["inputs"]
-        assert inputs["move-latest"]["default"] is True
+        assert "move-latest" not in inputs
+        assert "floating-tags" not in inputs
         assert "move-major" not in inputs
-        assert inputs["floating-tags"]["default"] == '["latest"]'
+        assert inputs["retags"]["default"] == ""
         jobs = data["jobs"]
         assert "retag" in jobs
         assert jobs["retag"]["needs"] == ["semver"]
         assert jobs["retag"]["uses"] == "./.github/workflows/retag.yml"
+        retag_if = jobs["retag"]["if"]
+        assert "inputs.retags != ''" in retag_if
+        assert "inputs.retags != '[]'" in retag_if
+        assert "move-latest" not in retag_if
         retag_with = jobs["retag"]["with"]
         assert "move-major" not in retag_with
         assert "release-tag" not in retag_with
-        assert retag_with["tags"] == "${{ inputs.floating-tags }}"
+        assert retag_with["tags"] == "${{ inputs.retags }}"
         # PyPI stays parallel with retag (needs semver only).
         assert jobs["pypi"]["needs"] == ["semver"]
         semver_steps = jobs["semver"]["steps"]
         step_names = [s.get("name", "") for s in semver_steps if isinstance(s, dict)]
         assert "Move floating major tag" not in step_names
+
+
+class TestDogfoodCdWorkflow:
+    def test_opts_into_latest_retags(self):
+        data = _load("cd.yml")
+        jobs = data["jobs"]
+        assert "semver" in jobs
+        with_block = jobs["semver"]["with"]
+        assert with_block["retags"] == '["latest"]'
+        assert "move-latest" not in with_block
+        assert "floating-tags" not in with_block

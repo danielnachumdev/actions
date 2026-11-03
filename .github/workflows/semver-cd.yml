@@ -1,5 +1,5 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
-# After release: force-move floating tags via retag.yml (latest by default).
+# After release: optional floating retags via retag.yml when `retags` is non-empty.
 # Optional: publish the same wheel to PyPI (Trusted Publishing or token).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
@@ -41,14 +41,12 @@ on:
         description: If true, upload the release wheel to PyPI after GitHub Release
         type: boolean
         default: false
-      move-latest:
-        description: If true, apply floating-tags (default includes latest) after release
-        type: boolean
-        default: true
-      floating-tags:
-        description: JSON array of floating tags to force-move after release (when move-latest)
+      retags:
+        description: >-
+          JSON array of floating tag names to force-move to the release SHA after
+          a real release (e.g. '["latest"]'). Empty string or [] = no-op (skip retag).
         type: string
-        default: '["latest"]'
+        default: ""
     secrets:
       PYPI_API_TOKEN:
         description: Optional PyPI API token (fallback when not using Trusted Publishing)
@@ -260,7 +258,7 @@ jobs:
             echo "version=${{ steps.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
           fi
 
-  # Floating tags (latest by default) via reusable retag.yml.
+  # Opt-in floating tags via reusable retag.yml (only when retags is non-empty).
   retag:
     name: Retag
     needs: [semver]
@@ -268,11 +266,12 @@ jobs:
       inputs.dry-run != true &&
       needs.semver.outputs.skip != 'true' &&
       needs.semver.outputs.tag != '' &&
-      inputs.move-latest == true
+      inputs.retags != '' &&
+      inputs.retags != '[]'
     uses: ./.github/workflows/retag.yml
     with:
       sha: ${{ inputs.sha }}
-      tags: ${{ inputs.floating-tags }}
+      tags: ${{ inputs.retags }}
       dry-run: false
 
   # Opt-in: same wheel as the GitHub Release → PyPI.

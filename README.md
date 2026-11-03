@@ -16,7 +16,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 - **Shared CI + optional post-merge knobs** — shared defaults; optional `*-push` / `skip-*-push` (no consumer `event_name` expressions)
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
-- **Floating `@latest`** after each CD release; prefer **`@v1`** for the stable major contract
+- **Opt-in floating tags** — pass `retags: '["latest"]'` on CD; prefer **`@v1`** pins
 - **Opt-in PyPI** — same release wheel via API token (OIDC later from thin CD)
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
@@ -42,6 +42,7 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
     with:
       sha: ${{ github.event.workflow_run.head_sha }}
+      retags: '["latest"]'   # opt-in; omit / "" / [] = no floating moves
 ```
 
 ## Docs
