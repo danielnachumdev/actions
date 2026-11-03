@@ -2,6 +2,9 @@ name: CI
 
 # Thin orchestrator. Prefer requiring checks "CI / CI" and "Semver / Semver".
 # Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
+#
+# Pin @v1 for the stable major contract, or @latest for always-newest release.
+# Prefer @v1 in production consumers.
 
 on:
   push:
@@ -25,12 +28,17 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
     # with:  # all optional — defaults + auto-detect pyproject.toml / package.json
     #   working-directory: .
-    #   python-versions: '["3.11","3.12","3.13"]'
+    #   python-versions: '["3.11","3.12","3.13"]'          # shared (both events)
+    #   python-versions-push: '["3.11","3.13"]'             # optional lighter post-merge
     #   node-versions: '["20","22"]'
     #   sync-args: "--group dev"
     #   pytest-args: "-q"
-    #   disable-python: false
+    #   disable-python: false                                 # never run lane (any event)
     #   disable-node: false
+    #   skip-node-push: true                                  # skip Node on push only
+    #   # *-push omitted or "" → inherit shared (not a clear). Skip lanes via skip-*-push.
+    #   # python-versions-push / node-versions-push / sync-args-push / pytest-args-push
+    #   # skip-python-push / skip-node-push
 
   semver:
     name: Semver

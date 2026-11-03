@@ -1,7 +1,8 @@
 name: CD
 
-# Thin orchestrator. Semver at CD = bump → wheel → GitHub Release → move vMAJOR
-# (or skip on noBump). Optional PyPI upload of the same wheel:
+# Thin orchestrator. Semver at CD = bump → wheel → GitHub Release → optional
+# retags (or skip on noBump). Pass retags to force-move floating tags (e.g. latest).
+# Optional PyPI:
 #   publish-pypi: true  +  permissions.id-token: write
 # Pin:
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
@@ -46,6 +47,8 @@ jobs:
       standards-ref: v1
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
       sha: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || (github.event.inputs.sha != '' && github.event.inputs.sha || github.sha) }}
+      # Opt-in: force-move floating latest after each real release (omit/""/[] = no-op).
+      retags: '["latest"]'
       # publish-pypi: true
     # User-owned repos: pass secrets by name (secrets: inherit is org/enterprise only).
     # Required whenever semver-cd declares secrets: — empty token is OK for OIDC-only.

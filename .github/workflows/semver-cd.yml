@@ -1,4 +1,5 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
+# After release: optional floating retags via retag.yml when `retags` is non-empty.
 # Optional: publish the same wheel to PyPI (Trusted Publishing or token).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
@@ -40,6 +41,12 @@ on:
         description: If true, upload the release wheel to PyPI after GitHub Release
         type: boolean
         default: false
+      retags:
+        description: >-
+          JSON array of floating tag names to force-move to the release SHA after
+          a real release (e.g. '["latest"]'). Empty string or [] = no-op (skip retag).
+        type: string
+        default: ""
     secrets:
       PYPI_API_TOKEN:
         description: Optional PyPI API token (fallback when not using Trusted Publishing)
@@ -237,20 +244,6 @@ jobs:
             echo "Published ${TAG} (${ACTION})"
           fi
 
-      # Keep floating major pin (e.g. @v1) on the latest release of that major.
-      - name: Move floating major tag
-        if: steps.already.outputs.skip != 'true' && steps.bump.outputs.skip != 'true' && inputs.dry-run != true
-        env:
-          TAG: ${{ steps.bump.outputs.tag }}
-          SHA: ${{ inputs.sha }}
-        run: |
-          set -euo pipefail
-          major="$(echo "${TAG}" | sed -E 's/^(v[0-9]+)\..*/\1/')"
-          [[ "${major}" =~ ^v[0-9]+$ ]]
-          git tag -f "${major}" "${SHA}"
-          git push origin "refs/tags/${major}" --force
-          echo "Moved floating tag ${major} → ${SHA} (${TAG})"
-
       - name: Final outputs
         id: final
         run: |
@@ -265,8 +258,25 @@ jobs:
             echo "version=${{ steps.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
           fi
 
+  # Opt-in floating tags via reusable retag.yml (only when retags is non-empty).
+  retag:
+    name: Retag
+    needs: [semver]
+    if: >
+      inputs.dry-run != true &&
+      needs.semver.outputs.skip != 'true' &&
+      needs.semver.outputs.tag != '' &&
+      inputs.retags != '' &&
+      inputs.retags != '[]'
+    uses: ./.github/workflows/retag.yml
+    with:
+      sha: ${{ inputs.sha }}
+      tags: ${{ inputs.retags }}
+      dry-run: false
+
   # Opt-in: same wheel as the GitHub Release → PyPI.
   # Prefer Trusted Publishing (OIDC). Fallback: secrets.PYPI_API_TOKEN.
+  # Runs in parallel with retag (both only need semver).
   pypi:
     name: PyPI
     needs: [semver]

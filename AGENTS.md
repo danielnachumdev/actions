@@ -11,9 +11,9 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | ---- | ------ |
 | Role | Shared reusable workflows + release scripts + templates; **also a consumer** of those blocks |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml` (`workflow_call` only; optional PyPI job) |
+| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml` (`workflow_call` only; optional PyPI job) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
-| Pinning (consumers) | **`@v1`** (floating major, moved by `semver-cd` on each release) |
+| Pinning (consumers) | Prefer **`@v1`**; **`@latest`** only if CD opts into `retags: '["latest"]'` |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
@@ -21,11 +21,12 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 .github/workflows/python.yml     # uv pytest matrix lane
 .github/workflows/node.yml       # Node/TS lint+test matrix lane
 .github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
-.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → vMAJOR → optional PyPI
+.github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → optional retag → optional PyPI
+.github/workflows/retag.yml      # force-move explicit floating tags (default: latest)
 .github/workflows/check.yml      # dogfood thin CI (name: CI)
 .github/workflows/cd.yml         # dogfood thin CD
 scripts/release/
-templates/                       # consumer copy-paste (pins @v1)
+templates/                       # consumer copy-paste CI/CD/retag (pins @v1)
 examples/
 tests/
 ```
@@ -44,6 +45,10 @@ jobs:
   ci:
     name: CI
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    # with:
+    #   python-versions: '["3.11","3.12","3.13"]'
+    #   python-versions-push: '["3.11","3.13"]'   # lighter post-merge
+    #   skip-node-push: true
   semver:
     name: Semver
     if: github.event_name == 'pull_request'
@@ -65,6 +70,8 @@ jobs:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}
       # publish-pypi: true
+      # Opt-in floating tags (empty/omit = no retag job):
+      retags: '["latest"]'
     secrets:
       # User repos: map by name (inherit is org/enterprise only). Empty OK for OIDC.
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -76,16 +83,31 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 
 ### `ci.yml` inputs (optional)
 
+Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`):
+
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
 | `working-directory` | `.` | App root |
 | `pyproject-path` | `pyproject.toml` | Presence → Python lane |
 | `package-json-path` | `package.json` | Presence → Node lane |
-| `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON |
-| `node-versions` | `["20","22"]` | Matrix JSON |
+| `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON (both events) |
+| `node-versions` | `["20","22"]` | Matrix JSON (both events) |
 | `sync-args` | `--group dev` | `uv sync` |
 | `pytest-args` | `-q` | `uv run pytest` |
-| `disable-python` / `disable-node` / `allow-empty` | `false` | Lane toggles |
+| `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
+
+Optional post-merge overrides (`push` / `workflow_dispatch` only). Omitted or `""` / `false` → shared default (empty does **not** clear a matrix; use `skip-*-push` to skip a lane). Do not pass `'[]'` as “run nothing”. Defaults preserve full matrices on both events.
+
+| Input | Default | Meaning |
+| ----- | ------- | ------- |
+| `python-versions-push` | `""` | Override Python matrix post-merge |
+| `node-versions-push` | `""` | Override Node matrix post-merge |
+| `sync-args-push` | `""` | Override `uv sync` args post-merge |
+| `pytest-args-push` | `""` | Override pytest args post-merge |
+| `skip-python-push` | `false` | Skip Python post-merge only |
+| `skip-node-push` | `false` | Skip Node post-merge only |
+
+Consumers must **not** inject `github.event_name` expressions for matrices — use these inputs.
 
 ### `semver-cd.yml` inputs
 
@@ -97,6 +119,17 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
 | `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
 | `publish-pypi` | `false` | Upload release wheel to PyPI |
+| `retags` | `""` | JSON array of floating tags to force-move after release; `""` / `[]` = no-op |
+
+### `retag.yml` inputs (standalone or via `semver-cd`)
+
+| Input | Default | Meaning |
+| ----- | ------- | ------- |
+| `sha` | required | Commit floating tags should point at |
+| `tags` | `["latest"]` | JSON array of tag names to force-move |
+| `dry-run` | `false` | Print planned moves only |
+
+Caller needs `permissions: contents: write`. Only moves tags listed in `tags`.
 
 ### `semver-cd.yml` secrets
 
@@ -110,7 +143,7 @@ Callers **must**:
 
 An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
-On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current. When `publish-pypi: true`, a follow-up **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
+On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.yml` with that list as `tags`. Empty `retags` (`""` or `[]`) skips the retag job. PyPI stays `needs: [semver]` only (parallel with retag). When `publish-pypi: true`, the **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off** and opts into `retags: '["latest"]'`.
 
 ---
 

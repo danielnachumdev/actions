@@ -4,16 +4,23 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
+
+## Pins: `@v1` vs `@latest`
+
+| Pin | Meaning |
+| --- | ------- |
+| **`@v1`** | Stable major contract. **Prefer this.** |
+| **`@latest`** | Newest successful release SHA when CD opts into `retags: '["latest"]'`. |
 
 ## Semver (one feature, two stages)
 
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
 | **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → move floating `vMAJOR` → optional PyPI |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → optional `retags` → optional PyPI |
 
 ## Wire-up
 
@@ -24,13 +31,75 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** if using CD); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
 6. Pin `@v1`  
-7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`
+7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
+8. Floating tags: pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+# optional standalone floating-tag mover:
+uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 ```
+
+### Opt-in floating retags (CD)
+
+`semver-cd` does **not** move floating tags unless `retags` is a non-empty JSON
+array. Pass the list you want force-moved to the release SHA (this repo and the
+CD template opt into `latest`):
+
+```yaml
+# in thin cd.yml → semver-cd
+with:
+  sha: ${{ github.event.workflow_run.head_sha }}
+  retags: '["latest"]'   # omit / "" / [] → skip retag job
+```
+
+### Optional standalone retag
+
+Copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) for a
+`workflow_dispatch` orchestrator that force-moves an explicit `tags` list to a
+SHA (recoveries, custom aliases, dry-run):
+
+```yaml
+# .github/workflows/retag.yml  — see templates/workflows/retag.yml
+jobs:
+  retag:
+    name: Retag
+    uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+    with:
+      sha: ${{ inputs.sha }}      # required commit SHA
+      tags: '["latest"]'          # tags to force-move
+      dry-run: true               # print planned moves only
+```
+
+Caller needs `permissions: contents: write`. Inputs: `sha`, `tags`, `dry-run`.
+
+### Shared CI + optional post-merge overrides (no consumer expressions)
+
+Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-args`, …)
+run on **both** `pull_request` and `push` / `workflow_dispatch`. Optional `*-push` /
+`skip-*-push` override only post-merge when set — do **not** write
+`python-versions: ${{ github.event_name == 'push' && '…' || '…' }}` in the thin orchestrator.
+
+```yaml
+jobs:
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    with:
+      python-versions: '["3.11","3.12","3.13"]'   # shared (both events)
+      python-versions-push: '["3.11","3.13"]'      # optional lighter post-merge
+      skip-node-push: true                           # optional: skip Node on push only
+```
+
+**Empty-string semantics:** omitting a `*-push` input and passing `""` are the same —
+both **inherit the shared default**. An empty string does **not** clear the matrix or
+mean “no versions”. To skip a lane on push only, set `skip-python-push` /
+`skip-node-push`. Do not pass `'[]'` as a “run nothing” signal (it is a non-empty
+override and will break the matrix). False `skip-*-push` also inherits (lane runs).
+Defaults keep the **full matrix on both** PR and push. `workflow_dispatch` uses the
+push knobs. Global `disable-python` / `disable-node` kill a lane for every event.
 
 ### Security settings (step 5)
 
