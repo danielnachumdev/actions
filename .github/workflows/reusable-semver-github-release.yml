@@ -1,0 +1,240 @@
+# After CI on main: resolve PR bump label → build wheel → GitHub Release.
+# Intended to be called from a thin product-repo CD workflow that already
+# gated on successful CI (workflow_run) or workflow_dispatch.
+#
+# Caller must pass the commit SHA to release. Build runs in the caller repo
+# checkout; standards scripts are fetched from this repository.
+
+name: Reusable semver GitHub Release
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit SHA to tag / release
+        type: string
+        required: true
+      standards-ref:
+        description: Git ref of danielnachumdev/actions for scripts
+        type: string
+        default: "v1"
+      python-version:
+        description: Python for uv build
+        type: string
+        default: "3.13"
+      dry-run:
+        description: Resolve bump only; do not create a Release
+        type: boolean
+        default: false
+      build-command:
+        description: >-
+          Shell command that prints wheel=<path>. Receives TAG via env.
+          Default uses this repo's build_python_uv_wheel.sh against the caller tree.
+        type: string
+        default: ""
+      latest-tag-override:
+        description: Optional latest tag override (empty = GitHub Release / pyproject seed)
+        type: string
+        default: ""
+    outputs:
+      skip:
+        description: Whether a release was skipped
+        value: ${{ jobs.semver.outputs.skip }}
+      tag:
+        description: Release tag (if not skipped)
+        value: ${{ jobs.semver.outputs.tag }}
+      version:
+        description: Bare version (if not skipped)
+        value: ${{ jobs.semver.outputs.version }}
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  semver:
+    name: semver
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      skip: ${{ steps.final.outputs.skip }}
+      tag: ${{ steps.final.outputs.tag }}
+      version: ${{ steps.final.outputs.version }}
+    steps:
+      - name: Checkout caller at SHA
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout standards
+        uses: actions/checkout@v7
+        with:
+          repository: danielnachumdev/actions
+          ref: ${{ inputs.standards-ref }}
+          path: .actions-standards
+
+      - name: Skip if commit already released
+        id: already
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          tags="$(git tag --points-at "${SHA}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)"
+          if [[ -n "${tags}" ]]; then
+            echo "Commit ${SHA} already tagged: ${tags}"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve labels + latest Release tag
+        id: bump
+        if: steps.already.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha }}
+          REPO: ${{ github.repository }}
+          LATEST_OVERRIDE: ${{ inputs.latest-tag-override }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api "repos/${REPO}/commits/${SHA}/pulls" \
+            -H "Accept: application/vnd.github.v3+json")"
+          labels_json="$(echo "${pr_json}" | python3 -c '
+          import json, sys
+          prs = json.load(sys.stdin)
+          if not prs:
+              raise SystemExit("no pull request associated with commit; cannot resolve bump labels")
+          chosen = None
+          for pr in prs:
+              base = (pr.get("base") or {}).get("ref") or ""
+              if base == "main" and pr.get("merged_at"):
+                  chosen = pr
+                  break
+          if chosen is None:
+              chosen = prs[0]
+          print(json.dumps(chosen.get("labels") or []))
+          ')"
+          pr_number="$(echo "${pr_json}" | python3 -c '
+          import json, sys
+          prs = json.load(sys.stdin)
+          chosen = None
+          for pr in prs:
+              base = (pr.get("base") or {}).get("ref") or ""
+              if base == "main" and pr.get("merged_at"):
+                  chosen = pr
+                  break
+          if chosen is None:
+              chosen = prs[0]
+          print(chosen.get("number") or "")
+          ')"
+          pr_title="$(echo "${pr_json}" | python3 -c '
+          import json, sys
+          prs = json.load(sys.stdin)
+          chosen = None
+          for pr in prs:
+              base = (pr.get("base") or {}).get("ref") or ""
+              if base == "main" and pr.get("merged_at"):
+                  chosen = pr
+                  break
+          if chosen is None:
+              chosen = prs[0]
+          print(chosen.get("title") or "")
+          ')"
+          latest="${LATEST_OVERRIDE}"
+          if [[ -z "${latest}" ]]; then
+            latest="$(gh release view --json tagName -q .tagName 2>/dev/null || true)"
+          fi
+          if [[ -z "${latest}" ]]; then
+            latest="$(python3 -c '
+          import pathlib, re
+          text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
+          match = re.search(r"^version = \"([^\"]+)\"", text, re.M)
+          if not match:
+              raise SystemExit("pyproject.toml: missing version = line")
+          print("v" + match.group(1))
+          ')"
+            echo "seeded latest_tag from pyproject: ${latest}"
+          fi
+          out="$(python3 .actions-standards/scripts/release/release_semver.py --latest-tag "${latest}" --labels-json "${labels_json}")"
+          echo "${out}"
+          skip="$(echo "${out}" | sed -n 's/^skip=//p')"
+          tag="$(echo "${out}" | sed -n 's/^tag=//p')"
+          action="$(echo "${out}" | sed -n 's/^action=//p')"
+          version="$(echo "${out}" | sed -n 's/^version=//p')"
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "action=${action}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
+          echo "pr_title=${pr_title}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip (noBump or already released)
+        if: steps.already.outputs.skip == 'true' || steps.bump.outputs.skip == 'true'
+        run: |
+          if [[ "${{ steps.already.outputs.skip }}" == "true" ]]; then
+            echo "Commit already has a release tag — not creating another."
+          else
+            echo "noBump: not creating a GitHub Release."
+          fi
+
+      - uses: astral-sh/setup-uv@v10.0.0
+        if: steps.already.outputs.skip != 'true' && steps.bump.outputs.skip != 'true' && inputs.dry-run != true
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Build wheel
+        id: wheel
+        if: steps.already.outputs.skip != 'true' && steps.bump.outputs.skip != 'true' && inputs.dry-run != true
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          BUILD_COMMAND: ${{ inputs.build-command }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${BUILD_COMMAND}" ]]; then
+            out="$(bash -lc "${BUILD_COMMAND}")"
+          else
+            out="$(bash .actions-standards/scripts/release/build_python_uv_wheel.sh "${TAG}" dist)"
+          fi
+          echo "${out}"
+          wheel="$(echo "${out}" | sed -n 's/^wheel=//p' | tail -1)"
+          [[ -n "${wheel}" && -f "${wheel}" ]]
+          echo "path=${wheel}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.already.outputs.skip != 'true' && steps.bump.outputs.skip != 'true' && inputs.dry-run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          ACTION: ${{ steps.bump.outputs.action }}
+          WHEEL: ${{ steps.wheel.outputs.path }}
+          PR_NUMBER: ${{ steps.bump.outputs.pr_number }}
+          PR_TITLE: ${{ steps.bump.outputs.pr_title }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --target "${SHA}" \
+            --generate-notes \
+            "${WHEEL}"
+          if [[ -n "${PR_NUMBER}" && "${PR_NUMBER}" != "null" ]]; then
+            echo "Published ${TAG} (${ACTION}) from #${PR_NUMBER}: ${PR_TITLE}"
+          else
+            echo "Published ${TAG} (${ACTION})"
+          fi
+
+      - name: Final outputs
+        id: final
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.already.outputs.skip }}" == "true" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=${{ steps.bump.outputs.skip }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ steps.bump.outputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "version=${{ steps.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
+          fi

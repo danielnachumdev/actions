@@ -1,0 +1,43 @@
+# Fail closed unless the PR has exactly one of:
+#   bumpMajor | bumpMinor | bumpPatch | noBump
+#
+# Caller example (on: pull_request):
+#   jobs:
+#     check-label:
+#       uses: danielnachumdev/actions/.github/workflows/reusable-release-label.yml@v1
+
+name: Reusable Release label
+
+on:
+  workflow_call:
+    inputs:
+      standards-ref:
+        description: Git ref of danielnachumdev/actions to fetch scripts from
+        type: string
+        default: "v1"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-label:
+    name: Release label
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout standards (release_semver)
+        uses: actions/checkout@v7
+        with:
+          repository: danielnachumdev/actions
+          ref: ${{ inputs.standards-ref }}
+          path: .actions-standards
+
+      - name: Require exactly one bump / noBump label
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+          python3 .actions-standards/scripts/release/release_semver.py \
+            --latest-tag v0.0.0 \
+            --labels-json "${LABELS_JSON}"

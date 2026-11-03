@@ -1,0 +1,18 @@
+[project]
+name = "danielnachumdev-actions-tests"
+version = "0.0.0"
+description = "Test harness for danielnachumdev/actions scripts (not published)"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.uv]
+default-groups = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

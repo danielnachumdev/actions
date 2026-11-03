@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit
+    uses: ./.github/workflows/reusable-python-uv-ci.yml
+    with:
+      python-versions: '["3.11","3.12","3.13"]'
+      sync-args: "--group dev"
+      pytest-args: "-q"
+
+  ci:
+    name: CI
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require test matrix success
+        run: |
+          set -euo pipefail
+          [[ "${{ needs.test.result }}" == "success" ]]
