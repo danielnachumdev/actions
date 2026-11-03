@@ -267,12 +267,12 @@ class TestSemverCdWorkflow:
 
 
 class TestDogfoodCdWorkflow:
-    def test_opts_into_latest_retags(self):
+    def test_opts_into_v1_and_latest_retags(self):
         data = _load("cd.yml")
         jobs = data["jobs"]
         assert "semver" in jobs
         with_block = jobs["semver"]["with"]
-        assert with_block["retags"] == '["latest"]'
+        assert with_block["retags"] == '["v1", "latest"]'
         assert "move-latest" not in with_block
         assert "floating-tags" not in with_block
 
