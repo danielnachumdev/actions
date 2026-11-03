@@ -1,15 +1,12 @@
 name: CD
 
-# Label gate on PRs; semver GitHub Release after successful CI on main.
-# Requires labels: bumpMajor | bumpMinor | bumpPatch | noBump (exactly one).
+# Thin orchestrator. Semver at CD = bump → wheel → GitHub Release (or skip on noBump).
+#   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -27,26 +24,19 @@ permissions:
   actions: read
 
 concurrency:
-  group: cd-${{ github.event.pull_request.number || github.event.workflow_run.head_sha || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: cd-${{ github.event.workflow_run.head_sha || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
-  check-label:
-    name: Release label
-    if: github.event_name == 'pull_request'
-    uses: danielnachumdev/actions/.github/workflows/reusable-release-label.yml@v1
-    with:
-      standards-ref: v1
-
   semver:
-    name: semver
+    name: Semver
     if: >
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main') ||
       github.event_name == 'workflow_dispatch'
-    uses: danielnachumdev/actions/.github/workflows/reusable-semver-github-release.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
     with:
       standards-ref: v1
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}

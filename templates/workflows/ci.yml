@@ -1,12 +1,14 @@
 name: CI
 
-# Thin orchestrator — validation only. Pin standards with a tag (e.g. @v1).
+# Thin orchestrator. Prefer requiring checks "CI / CI" and "Semver / Semver".
+# Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 concurrency:
@@ -15,26 +17,22 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  test:
-    name: Unit
-    uses: danielnachumdev/actions/.github/workflows/reusable-python-uv-ci.yml@v1
-    with:
-      python-versions: '["3.11","3.12","3.13"]'
-      sync-args: "--group dev"
-      pytest-args: "-q"
-
   ci:
     name: CI
-    needs: [test]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require test matrix success
-        run: |
-          set -euo pipefail
-          result="${{ needs.test.result }}"
-          echo "test: ${result}"
-          [[ "${result}" == "success" ]]
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    # with:  # all optional — defaults + auto-detect
+    #   working-directory: .
+    #   pyproject-path: pyproject.toml
+    #   python-versions: '["3.11","3.12","3.13"]'
+    #   sync-args: "--group dev"
+    #   pytest-args: "-q"
+
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    with:
+      standards-ref: v1

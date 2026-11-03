@@ -1,18 +1,15 @@
-# Fail closed unless the PR has exactly one of:
-#   bumpMajor | bumpMinor | bumpPatch | noBump
+# Semver at CI (PR) — require exactly one bump label.
+#   uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 #
-# Caller example (on: pull_request):
-#   jobs:
-#     check-label:
-#       uses: danielnachumdev/actions/.github/workflows/reusable-release-label.yml@v1
+# Allowed labels: noBump | bumpPatch | bumpMinor | bumpMajor
 
-name: Reusable Release label
+name: semver-ci
 
 on:
   workflow_call:
     inputs:
       standards-ref:
-        description: Git ref of danielnachumdev/actions to fetch scripts from
+        description: Git ref of danielnachumdev/actions for scripts
         type: string
         default: "v1"
 
@@ -21,12 +18,12 @@ permissions:
   pull-requests: read
 
 jobs:
-  check-label:
-    name: Release label
+  semver:
+    name: Semver
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout standards (release_semver)
+      - name: Checkout standards
         uses: actions/checkout@v7
         with:
           repository: danielnachumdev/actions

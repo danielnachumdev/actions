@@ -1,0 +1,38 @@
+# How to use
+
+Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
+
+## Folders
+
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `semver-ci.yml`, `semver-cd.yml`.
+
+## Semver (one feature, two stages)
+
+| Stage | Workflow | Behavior |
+| ----- | -------- | -------- |
+| **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release |
+
+## Wire-up
+
+1. Copy [`templates/workflows/ci.yml`](templates/workflows/ci.yml) + [`cd.yml`](templates/workflows/cd.yml)  
+2. Copy [`templates/github/`](templates/github/) CODEOWNERS + dependabot  
+3. Create labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
+4. Protect `main`: require **`CI / CI`** and **`Semver / Semver`**  
+5. Enable Dependabot alerts + private vulnerability reporting  
+6. Pin `@v1`
+
+```yaml
+uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+```
+
+## Verify
+
+```bash
+uv sync --group dev && uv run pytest -q
+python3 scripts/release/release_semver.py --latest-tag v1.2.3 --label bumpPatch
+```
+
+See also: [`README.md`](README.md) (overview) · [`AGENTS.md`](AGENTS.md) (implementation details).

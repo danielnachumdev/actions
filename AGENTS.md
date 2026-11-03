@@ -1,41 +1,105 @@
 # AGENTS.md — danielnachumdev/actions
 
-Guide for changing **this** standards repo. User-facing consume docs: [`README.md`](README.md). Rollout checklist: [`PLAYBOOK.md`](PLAYBOOK.md).
+Implementation guide for maintainers and coding agents.  
+Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](HOW-TO-USE.md).
+
+---
 
 ## Orientation
 
 | Item | Detail |
 | ---- | ------ |
 | Role | Shared reusable workflows + release scripts + templates |
-| Python | `>=3.11` (test harness only; not a published package) |
-| Pinning | Callers must use **tags** (`@v1`); breaking changes → `v2` |
-| Do not | Put product-specific SPA/e2e/path-filter logic here |
-
-## Layout
+| Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
+| Short names | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` |
+| Pinning | **`@v1`** |
+| Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 
 ```text
-.github/workflows/     # reusable-*.yml (+ CI for this repo)
-scripts/release/       # release_semver.py, build_python_uv_wheel.sh
-templates/             # copy-paste starters for product repos
-examples/              # oriented walkthroughs (python-uv-library)
-tests/                 # pytest for release_semver
-PLAYBOOK.md            # generalize & apply to other repos
+.github/workflows/ci.yml         # public CI entry (+ dogfood)
+.github/workflows/python.yml     # uv pytest matrix lane
+.github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
+.github/workflows/semver-cd.yml  # CD stage: bump → wheel → GitHub Release
+scripts/release/
+templates/
+examples/
+tests/
 ```
 
-## Develop
+There is **one semver feature**. `semver-ci` and `semver-cd` are the same rules at different pipeline stages — not a separate “label” product.
+
+---
+
+## Consumer pins
+
+```yaml
+# CI — tests + semver label gate
+jobs:
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    with:
+      standards-ref: v1
+```
+
+```yaml
+# CD — after successful CI on main
+jobs:
+  semver:
+    name: Semver
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    with:
+      standards-ref: v1
+      sha: ${{ github.event.workflow_run.head_sha }}
+```
+
+Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
+
+Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label edits re-run `semver-ci`.
+
+### `ci.yml` inputs (optional)
+
+| Input | Default | Meaning |
+| ----- | ------- | ------- |
+| `working-directory` | `.` | App root |
+| `pyproject-path` | `pyproject.toml` | Presence → Python lane |
+| `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON |
+| `sync-args` | `--group dev` | `uv sync` |
+| `pytest-args` | `-q` | `uv run pytest` |
+| `disable-python` / `allow-empty` | `false` | Lane toggles |
+
+### `semver-cd.yml` inputs
+
+| Input | Default | Meaning |
+| ----- | ------- | ------- |
+| `sha` | required | Commit to tag / release |
+| `standards-ref` | `v1` | Ref for scripts checkout |
+| `dry-run` | `false` | Resolve only |
+| `build-command` | (default wheel script) | Must print `wheel=<path>`; `TAG` in env |
+| `python-version` / `latest-tag-override` | `3.13` / empty | Build Python / force latest tag |
+
+---
+
+## Pitfalls
+
+1. No `.github/workflows/**/subdirs` for reusable workflows.
+2. `uses: ./.github/actions/...` inside `workflow_call` resolves to the **caller** — use full `danielnachumdev/actions/...@v1` or inline (as `ci.yml` detect does).
+3. `uses:` must be a literal string.
+4. No `${{ secrets.* }}` inside `workflow_call` `description:` fields.
+
+---
+
+## Develop this repo
 
 ```bash
 uv sync --group dev
 uv run pytest -q
 ```
 
-When changing reusable workflow **inputs** in a breaking way, cut a new major tag and update `templates/` + `PLAYBOOK.md` in the same PR.
+Breaking inputs/check names → new major tag; update templates + [`HOW-TO-USE.md`](HOW-TO-USE.md) + consumers together.
 
-## Release this repo
-
-Use the same label rules as consumers (`bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump`).  
-Tagging strategy for callers: keep a moving major tag `v1` pointing at the latest compatible release, or document `v1.x.y` pins only.
-
-## PR requirements
-
-Exactly one release label. Do not break `@v1` callers without a major bump and playbook note.
+PRs into `main` need exactly one semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.

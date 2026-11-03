@@ -1,48 +1,56 @@
 # actions
 
-**Shared GitHub Actions + release standards** for [danielnachumdev](https://github.com/danielnachumdev) repositories.
+**One place to standardize CI and releases** across [danielnachumdev](https://github.com/danielnachumdev) repositories — short pins, sensible defaults, label-driven semver.
 
-This repo is both:
+[![CI](https://github.com/danielnachumdev/actions/actions/workflows/ci.yml/badge.svg)](https://github.com/danielnachumdev/actions/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/danielnachumdev/actions)
 
-1. **Reference** — playbook, templates, and examples for CI/CD and repo hygiene  
-2. **Consumable** — versioned reusable workflows you call with `uses: danielnachumdev/actions/...@v1`
+Stop copying the same pytest matrix and release YAML into every library. **Pin `@v1` once**, keep product repos thin, and ship GitHub Releases when a PR says `bumpPatch` — not when someone remembers to bump a version file.
 
-Product repos stay thin: they own domain tests and packaging; this repo owns label-driven semver, shared Python-uv CI, and the scripts behind them.
+## Why this repo?
 
-## Consume
+- **Short workflow names** — `ci.yml`, `semver-ci.yml`, `semver-cd.yml`
+- **One semver concept, two stages** — validate labels in CI; bump + Release in CD
+- **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
+- **Defaults that fit uv libraries** — Python 3.11–3.13, auto-detect `pyproject.toml`
+- **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
-Pin a **tag** (not `main`):
+## Sixty-second start
 
 ```yaml
+# .github/workflows/ci.yml
 jobs:
-  test:
-    uses: danielnachumdev/actions/.github/workflows/reusable-python-uv-ci.yml@v1
-    with:
-      python-versions: '["3.11","3.12","3.13"]'
-      sync-args: "--group dev"
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 ```
 
-| Workflow | Purpose |
-| -------- | ------- |
-| `reusable-python-uv-ci.yml` | `uv sync` + pytest matrix |
-| `reusable-release-label.yml` | PR must have exactly one of `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` |
-| `reusable-semver-github-release.yml` | After CI on `main`: bump → wheel → GitHub Release |
+```yaml
+# .github/workflows/cd.yml  (after CI succeeds on main)
+jobs:
+  semver:
+    name: Semver
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    with:
+      sha: ${{ github.event.workflow_run.head_sha }}
+```
 
-Copy-paste starters: [`templates/workflows/`](templates/workflows/) · [`templates/github/`](templates/github/)  
-End-to-end library example: [`examples/python-uv-library/`](examples/python-uv-library/)  
-Full checklist: [`PLAYBOOK.md`](PLAYBOOK.md)
+## Docs
 
-## Scripts
+| Doc | What |
+| --- | ---- |
+| [`HOW-TO-USE.md`](HOW-TO-USE.md) | Adopt in a consumer repo (checklist) |
+| [`AGENTS.md`](AGENTS.md) | Implementation details for maintainers / coding agents |
+| [`templates/`](templates/) | Copy-paste CI/CD + CODEOWNERS / Dependabot starters |
 
-| Path | Role |
-| ---- | ---- |
-| `scripts/release/release_semver.py` | Label → next `vX.Y.Z` (or skip on `noBump`) |
-| `scripts/release/build_python_uv_wheel.sh` | Stamp version + `uv build --wheel` |
+## Who it’s for
 
-## Develop this repo
+**Python / uv** libraries under danielnachumdev (e.g. [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper)). Heavier org stacks stay on their own hubs.
 
-See [`AGENTS.md`](AGENTS.md). Tests: `uv sync --group dev && uv run pytest -q`.
+## License
 
-## Versioning
-
-Breaking workflow/input changes → new major tag (`v2`). Callers should pin `@v1` or a full `v1.x.y` tag.
+MIT — pin a tag in production.
