@@ -58,8 +58,7 @@ class TestCiWorkflow:
             "node-versions-push",
             "sync-args",
             "sync-args-push",
-            "pytest-args",
-            "pytest-args-push",
+            "pytest-command",
             "skip-python-push",
             "skip-node-push",
             "disable-python",
@@ -72,12 +71,24 @@ class TestCiWorkflow:
             assert not key.endswith("-pr"), key
             assert not key.startswith("skip-") or key.endswith("-push"), key
         assert inputs["python-versions-push"]["default"] == ""
+        assert inputs["pytest-command"]["default"] == "pytest -q"
+        assert "pytest-command-push" not in inputs
         assert inputs["skip-python-push"]["default"] is False
         jobs = data["jobs"]
         assert "detect" in jobs and "python" in jobs and "node" in jobs and "ci" in jobs
         detect_outputs = jobs["detect"]["outputs"]
-        for key in ("python_versions", "node_versions", "sync_args", "pytest_args"):
+        for key in (
+            "python_versions",
+            "node_versions",
+            "sync_args",
+            "pytest_command",
+        ):
             assert key in detect_outputs, key
+        python_with = jobs["python"]["with"]
+        assert python_with["pytest-command"] == (
+            "${{ needs.detect.outputs.pytest_command }}"
+        )
+        assert "pytest-args" not in python_with
 
     def test_timeout_inputs_wired_to_jobs(self):
         data = _load("ci.yml")
@@ -102,6 +113,20 @@ class TestPythonWorkflow:
         inputs = _on(data)["workflow_call"]["inputs"]
         _assert_timeout_input(inputs, "timeout-minutes")
         _assert_job_timeout_wired(data["jobs"]["test"], "timeout-minutes")
+
+    def test_pytest_command_defaults_and_wired(self):
+        data = _load("python.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        assert inputs["pytest-command"]["default"] == "pytest -q"
+        assert "pytest-args" not in inputs
+        steps = data["jobs"]["test"]["steps"]
+        pytest_step = next(
+            s for s in steps if isinstance(s, dict) and s.get("name") == "Pytest"
+        )
+        assert pytest_step["run"] == "uv run ${{ inputs.pytest-command }}"
+        assert data["jobs"]["test"]["defaults"]["run"]["working-directory"] == (
+            "${{ inputs.working-directory }}"
+        )
 
 
 class TestNodeWorkflow:

@@ -19,10 +19,12 @@ on:
         description: Extra args to uv sync
         type: string
         default: "--group dev"
-      pytest-args:
-        description: Extra args to uv run pytest
+      pytest-command:
+        description: >-
+          Full pytest invocation under `uv run` in working-directory
+          (include flags here, e.g. `pytest -q`). Default `pytest -q`.
         type: string
-        default: "-q"
+        default: "pytest -q"
       timeout-minutes:
         description: Job timeout for each matrix cell (minutes)
         type: number
@@ -51,4 +53,4 @@ jobs:
       - name: Install package + deps
         run: uv sync ${{ inputs.sync-args }}
       - name: Pytest
-        run: uv run pytest ${{ inputs.pytest-args }}
+        run: uv run ${{ inputs.pytest-command }}

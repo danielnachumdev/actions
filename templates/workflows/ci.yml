@@ -32,12 +32,12 @@ jobs:
     #   python-versions-push: '["3.11","3.13"]'             # optional lighter post-merge
     #   node-versions: '["20","22"]'
     #   sync-args: "--group dev"
-    #   pytest-args: "-q"
+    #   pytest-command: "pytest -q"                         # full cmd under uv run (flags included)
     #   disable-python: false                                 # never run lane (any event)
     #   disable-node: false
     #   skip-node-push: true                                  # skip Node on push only
     #   # *-push omitted or "" → inherit shared (not a clear). Skip lanes via skip-*-push.
-    #   # python-versions-push / node-versions-push / sync-args-push / pytest-args-push
+    #   # python-versions-push / node-versions-push / sync-args-push
     #   # skip-python-push / skip-node-push
     #   # Timeouts (minutes; defaults preserve prior hardcodes):
     #   # detect-timeout-minutes: 5

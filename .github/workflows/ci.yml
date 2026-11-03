@@ -63,16 +63,12 @@ on:
           (not a clear).
         type: string
         default: ""
-      pytest-args:
-        description: Extra args to uv run pytest (shared; both events)
-        type: string
-        default: "-q"
-      pytest-args-push:
+      pytest-command:
         description: >-
-          Optional post-merge override of pytest-args. Omitted or "" inherits
-          shared (not a clear).
+          Full pytest invocation under `uv run` in working-directory (same for PR
+          and push; include flags in the command). Default `pytest -q`.
         type: string
-        default: ""
+        default: "pytest -q"
       disable-python:
         description: If true, never run the Python lane (any event)
         type: boolean
@@ -125,7 +121,7 @@ jobs:
       python_versions: ${{ steps.layout.outputs.python_versions }}
       node_versions: ${{ steps.layout.outputs.node_versions }}
       sync_args: ${{ steps.layout.outputs.sync_args }}
-      pytest_args: ${{ steps.layout.outputs.pytest_args }}
+      pytest_command: ${{ steps.layout.outputs.pytest_command }}
     steps:
       - uses: actions/checkout@v7
       # Inline detect (not ./.github/actions/…): relative action paths resolve to the
@@ -145,8 +141,7 @@ jobs:
           NODE_VERSIONS_PUSH: ${{ inputs.node-versions-push }}
           SYNC_ARGS: ${{ inputs.sync-args || '--group dev' }}
           SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
-          PYTEST_ARGS: ${{ inputs.pytest-args || '-q' }}
-          PYTEST_ARGS_PUSH: ${{ inputs.pytest-args-push }}
+          PYTEST_COMMAND: ${{ inputs.pytest-command || 'pytest -q' }}
           SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
           SKIP_NODE_PUSH: ${{ inputs.skip-node-push == true && 'true' || 'false' }}
         run: |
@@ -181,7 +176,7 @@ jobs:
           python_versions="$(pick "${PYTHON_VERSIONS}" "${PYTHON_VERSIONS_PUSH}")"
           node_versions="$(pick "${NODE_VERSIONS}" "${NODE_VERSIONS_PUSH}")"
           sync_args="$(pick "${SYNC_ARGS}" "${SYNC_ARGS_PUSH}")"
-          pytest_args="$(pick "${PYTEST_ARGS}" "${PYTEST_ARGS_PUSH}")"
+          pytest_command="${PYTEST_COMMAND}"
 
           if [[ "${event_kind}" == "push" ]]; then
             skip_python="${SKIP_PYTHON_PUSH}"
@@ -210,16 +205,16 @@ jobs:
             echo "sync_args<<EOF_SYNC"
             echo "${sync_args}"
             echo "EOF_SYNC"
-            echo "pytest_args<<EOF_PYTEST"
-            echo "${pytest_args}"
-            echo "EOF_PYTEST"
+            echo "pytest_command<<EOF_PYTEST_CMD"
+            echo "${pytest_command}"
+            echo "EOF_PYTEST_CMD"
           } >> "$GITHUB_OUTPUT"
 
           echo "detect: event=${EVENT_NAME} kind=${event_kind} root=${root}"
           echo "detect: pyproject=${pyproject} package_json=${package_json}"
           echo "detect: run_python=${run_python} run_node=${run_node} skip_python=${skip_python} skip_node=${skip_node}"
           echo "detect: python_versions=${python_versions} node_versions=${node_versions}"
-          echo "detect: sync_args=${sync_args} pytest_args=${pytest_args}"
+          echo "detect: sync_args=${sync_args} pytest_command=${pytest_command}"
 
   python:
     name: Python
@@ -230,7 +225,7 @@ jobs:
       working-directory: ${{ needs.detect.outputs.working_directory }}
       python-versions: ${{ needs.detect.outputs.python_versions }}
       sync-args: ${{ needs.detect.outputs.sync_args }}
-      pytest-args: ${{ needs.detect.outputs.pytest_args }}
+      pytest-command: ${{ needs.detect.outputs.pytest_command }}
       timeout-minutes: ${{ inputs.python-timeout-minutes }}
 
   node:

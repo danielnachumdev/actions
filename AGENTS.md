@@ -93,7 +93,7 @@ Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`
 | `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON (both events) |
 | `node-versions` | `["20","22"]` | Matrix JSON (both events) |
 | `sync-args` | `--group dev` | `uv sync` |
-| `pytest-args` | `-q` | `uv run pytest` |
+| `pytest-command` | `pytest -q` | Full invocation under `uv run` (cwd = working-directory; same PR + push) |
 | `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
 | `detect-timeout-minutes` | `5` | Detect job timeout |
 | `python-timeout-minutes` | `30` | Passed to `python.yml` per matrix cell |
@@ -107,7 +107,6 @@ Optional post-merge overrides (`push` / `workflow_dispatch` only). Omitted or `"
 | `python-versions-push` | `""` | Override Python matrix post-merge |
 | `node-versions-push` | `""` | Override Node matrix post-merge |
 | `sync-args-push` | `""` | Override `uv sync` args post-merge |
-| `pytest-args-push` | `""` | Override pytest args post-merge |
 | `skip-python-push` | `false` | Skip Python post-merge only |
 | `skip-node-push` | `false` | Skip Node post-merge only |
 
@@ -128,7 +127,6 @@ Consumers must **not** inject `github.event_name` expressions for matrices — u
 | `pypi-timeout-minutes` | `15` | Opt-in PyPI publish job |
 | `retag-timeout-minutes` | `10` | Passed to `retag.yml` |
 
-Leaf workflows (`python.yml`, `node.yml`, `semver-ci.yml`, `retag.yml`) each expose a single `timeout-minutes` input (defaults `30` / `30` / `5` / `10`) for direct callers.
 
 ### `retag.yml` inputs (standalone or via `semver-cd`)
 
