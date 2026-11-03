@@ -1,4 +1,6 @@
-# Playbook: standardize a repo (CI + semver CD + hygiene)
+# How to use
+
+Adopt `danielnachumdev/actions` in a consumer repo (CI + semver CD + hygiene).
 
 ## Folders
 
@@ -32,3 +34,5 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 uv sync --group dev && uv run pytest -q
 python3 scripts/release/release_semver.py --latest-tag v1.2.3 --label bumpPatch
 ```
+
+See also: [`README.md`](README.md) (overview) · [`AGENTS.md`](AGENTS.md) (implementation details).

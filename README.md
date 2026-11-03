@@ -39,7 +39,13 @@ jobs:
       sha: ${{ github.event.workflow_run.head_sha }}
 ```
 
-Starters: [`templates/`](templates/) · checklist: [`PLAYBOOK.md`](PLAYBOOK.md) · details: [`AGENTS.md`](AGENTS.md)
+## Docs
+
+| Doc | What |
+| --- | ---- |
+| [`HOW-TO-USE.md`](HOW-TO-USE.md) | Adopt in a consumer repo (checklist) |
+| [`AGENTS.md`](AGENTS.md) | Implementation details for maintainers / coding agents |
+| [`templates/`](templates/) | Copy-paste CI/CD + CODEOWNERS / Dependabot starters |
 
 ## Who it’s for
 

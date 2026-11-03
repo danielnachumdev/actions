@@ -1,6 +1,7 @@
 # AGENTS.md — danielnachumdev/actions
 
-Implementation and usage guide. Pitch: [`README.md`](README.md). Rollout: [`PLAYBOOK.md`](PLAYBOOK.md).
+Implementation guide for maintainers and coding agents.  
+Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](HOW-TO-USE.md).
 
 ---
 
@@ -99,6 +100,6 @@ uv sync --group dev
 uv run pytest -q
 ```
 
-Breaking inputs/check names → new major tag; update templates + playbook + consumers together.
+Breaking inputs/check names → new major tag; update templates + [`HOW-TO-USE.md`](HOW-TO-USE.md) + consumers together.
 
 PRs into `main` need exactly one semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
