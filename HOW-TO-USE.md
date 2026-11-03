@@ -33,7 +33,8 @@ Both are force-moved by CD after each release (`semver-cd` → `retag.yml`).
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** if using CD); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; you merge  
 6. Pin `@v1`  
-7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`
+7. PyPI publishers only: `publish-pypi: true` + repo secret `PYPI_API_TOKEN`  
+8. Optional manual retag only: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml) (CD already moves `latest` + `vMAJOR`)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
@@ -42,6 +43,30 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 # optional standalone floating-tag mover:
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 ```
+
+### Optional standalone retag
+
+`semver-cd` already force-moves `latest` + `vMAJOR` after each release. Copy
+[`templates/workflows/retag.yml`](templates/workflows/retag.yml) only when you
+need a manual `workflow_dispatch` orchestrator (recover a mistag, point custom
+aliases, dry-run a move):
+
+```yaml
+# .github/workflows/retag.yml  — see templates/workflows/retag.yml
+jobs:
+  retag:
+    name: Retag
+    uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+    with:
+      sha: ${{ inputs.sha }}                 # required commit SHA
+      tags: '["latest"]'                     # JSON array; default ["latest"]
+      move-major: true                       # also move vMAJOR from release-tag
+      release-tag: ${{ inputs.release_tag }} # e.g. v1.2.3 (required if move-major)
+      dry-run: true                          # print planned moves only
+```
+
+Caller needs `permissions: contents: write`. Inputs match reusable `retag.yml`
+(`sha`, `tags`, `move-major`, `release-tag`, `dry-run`).
 
 ### Shared CI + optional post-merge overrides (no consumer expressions)
 

@@ -22,4 +22,7 @@ with:
   python-versions-push: '["3.11","3.13"]'
 ```
 
+Optional manual floating-tag mover (usually skip — CD already retags `latest` +
+`vMAJOR`): copy [`templates/workflows/retag.yml`](../../templates/workflows/retag.yml).
+
 Reference: [gp_wrapper](https://github.com/danielnachumdev/gp_wrapper).

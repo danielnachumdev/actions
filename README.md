@@ -50,7 +50,7 @@ jobs:
 | --- | ---- |
 | [`HOW-TO-USE.md`](HOW-TO-USE.md) | Adopt in a consumer repo (checklist) |
 | [`AGENTS.md`](AGENTS.md) | Implementation details for maintainers / coding agents |
-| [`templates/`](templates/) | Copy-paste CI/CD + CODEOWNERS / Dependabot starters |
+| [`templates/`](templates/) | Copy-paste CI/CD / retag + CODEOWNERS / Dependabot starters |
 
 ## Who it’s for
 

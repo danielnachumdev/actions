@@ -26,7 +26,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 .github/workflows/check.yml      # dogfood thin CI (name: CI)
 .github/workflows/cd.yml         # dogfood thin CD
 scripts/release/
-templates/                       # consumer copy-paste (pins @v1)
+templates/                       # consumer copy-paste CI/CD/retag (pins @v1)
 examples/
 tests/
 ```
