@@ -29,23 +29,25 @@ class TestCiWorkflow:
         inputs = _on(data)["workflow_call"]["inputs"]
         for key in (
             "python-versions",
-            "python-versions-pr",
             "python-versions-push",
-            "node-versions-pr",
+            "node-versions",
             "node-versions-push",
-            "sync-args-pr",
+            "sync-args",
             "sync-args-push",
-            "pytest-args-pr",
+            "pytest-args",
             "pytest-args-push",
-            "skip-python-pr",
             "skip-python-push",
-            "skip-node-pr",
             "skip-node-push",
             "disable-python",
             "disable-node",
+            "allow-empty",
         ):
             assert key in inputs, key
-        assert inputs["python-versions-pr"]["default"] == ""
+        # No pre-merge-only overrides — shared defaults cover pull_request.
+        for key in list(inputs):
+            assert not key.endswith("-pr"), key
+            assert not key.startswith("skip-") or key.endswith("-push"), key
+        assert inputs["python-versions-push"]["default"] == ""
         assert inputs["skip-python-push"]["default"] is False
         jobs = data["jobs"]
         assert "detect" in jobs and "python" in jobs and "node" in jobs and "ci" in jobs

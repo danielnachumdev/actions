@@ -8,9 +8,10 @@
 # workflows. Organize with short flat names (ci, python, node, semver-ci, semver-cd).
 # Composite actions MAY live under .github/actions/<name>/ (see detect-layout).
 #
-# Pre-merge (pull_request) vs post-merge (push / workflow_dispatch) knobs are
-# separate inputs — consumers should NOT inject event_name expressions themselves.
-# Empty event-specific strings fall back to the shared baseline inputs.
+# Shared inputs run on both pre-merge (pull_request) and post-merge
+# (push / workflow_dispatch). Optional *-push / skip-*-push override only on
+# post-merge when set; empty/false inherits the shared default. Consumers should
+# NOT inject event_name expressions themselves.
 
 name: ci
 
@@ -30,49 +31,33 @@ on:
         type: string
         default: "package.json"
       python-versions:
-        description: JSON array of Python versions (shared baseline)
+        description: JSON array of Python versions (shared; both events)
         type: string
         default: '["3.11","3.12","3.13"]'
-      python-versions-pr:
-        description: Override python-versions on pull_request (empty = shared)
-        type: string
-        default: ""
       python-versions-push:
         description: Override python-versions on push/workflow_dispatch (empty = shared)
         type: string
         default: ""
       node-versions:
-        description: JSON array of Node versions (shared baseline)
+        description: JSON array of Node versions (shared; both events)
         type: string
         default: '["20","22"]'
-      node-versions-pr:
-        description: Override node-versions on pull_request (empty = shared)
-        type: string
-        default: ""
       node-versions-push:
         description: Override node-versions on push/workflow_dispatch (empty = shared)
         type: string
         default: ""
       sync-args:
-        description: Extra args to uv sync (shared baseline)
+        description: Extra args to uv sync (shared; both events)
         type: string
         default: "--group dev"
-      sync-args-pr:
-        description: Override sync-args on pull_request (empty = shared)
-        type: string
-        default: ""
       sync-args-push:
         description: Override sync-args on push/workflow_dispatch (empty = shared)
         type: string
         default: ""
       pytest-args:
-        description: Extra args to uv run pytest (shared baseline)
+        description: Extra args to uv run pytest (shared; both events)
         type: string
         default: "-q"
-      pytest-args-pr:
-        description: Override pytest-args on pull_request (empty = shared)
-        type: string
-        default: ""
       pytest-args-push:
         description: Override pytest-args on push/workflow_dispatch (empty = shared)
         type: string
@@ -85,16 +70,8 @@ on:
         description: If true, never run the Node lane (any event)
         type: boolean
         default: false
-      skip-python-pr:
-        description: Skip Python lane on pull_request only
-        type: boolean
-        default: false
       skip-python-push:
         description: Skip Python lane on push/workflow_dispatch only
-        type: boolean
-        default: false
-      skip-node-pr:
-        description: Skip Node lane on pull_request only
         type: boolean
         default: false
       skip-node-push:
@@ -136,20 +113,14 @@ jobs:
           DISABLE_NODE: ${{ inputs.disable-node == true && 'true' || 'false' }}
           EVENT_NAME: ${{ github.event_name }}
           PYTHON_VERSIONS: ${{ inputs.python-versions || '["3.11","3.12","3.13"]' }}
-          PYTHON_VERSIONS_PR: ${{ inputs.python-versions-pr }}
           PYTHON_VERSIONS_PUSH: ${{ inputs.python-versions-push }}
           NODE_VERSIONS: ${{ inputs.node-versions || '["20","22"]' }}
-          NODE_VERSIONS_PR: ${{ inputs.node-versions-pr }}
           NODE_VERSIONS_PUSH: ${{ inputs.node-versions-push }}
           SYNC_ARGS: ${{ inputs.sync-args || '--group dev' }}
-          SYNC_ARGS_PR: ${{ inputs.sync-args-pr }}
           SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
           PYTEST_ARGS: ${{ inputs.pytest-args || '-q' }}
-          PYTEST_ARGS_PR: ${{ inputs.pytest-args-pr }}
           PYTEST_ARGS_PUSH: ${{ inputs.pytest-args-push }}
-          SKIP_PYTHON_PR: ${{ inputs.skip-python-pr == true && 'true' || 'false' }}
           SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
-          SKIP_NODE_PR: ${{ inputs.skip-node-pr == true && 'true' || 'false' }}
           SKIP_NODE_PUSH: ${{ inputs.skip-node-push == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
@@ -161,7 +132,7 @@ jobs:
           package_json="${root%/}/${PACKAGE_JSON_PATH}"
           package_json="${package_json#./}"
 
-          # pull_request = pre-merge; push + workflow_dispatch = post-merge knobs
+          # Shared defaults on both events; *-push only on post-merge.
           if [[ "${EVENT_NAME}" == "pull_request" ]]; then
             event_kind=pr
           else
@@ -169,26 +140,26 @@ jobs:
           fi
 
           pick() {
-            # pick <shared> <pr_override> <push_override>
-            local shared="$1" pr="$2" push="$3"
-            if [[ "${event_kind}" == "pr" ]]; then
-              if [[ -n "${pr}" ]]; then echo "${pr}"; else echo "${shared}"; fi
+            # pick <shared> <push_override>
+            local shared="$1" push="$2"
+            if [[ "${event_kind}" == "push" && -n "${push}" ]]; then
+              echo "${push}"
             else
-              if [[ -n "${push}" ]]; then echo "${push}"; else echo "${shared}"; fi
+              echo "${shared}"
             fi
           }
 
-          python_versions="$(pick "${PYTHON_VERSIONS}" "${PYTHON_VERSIONS_PR}" "${PYTHON_VERSIONS_PUSH}")"
-          node_versions="$(pick "${NODE_VERSIONS}" "${NODE_VERSIONS_PR}" "${NODE_VERSIONS_PUSH}")"
-          sync_args="$(pick "${SYNC_ARGS}" "${SYNC_ARGS_PR}" "${SYNC_ARGS_PUSH}")"
-          pytest_args="$(pick "${PYTEST_ARGS}" "${PYTEST_ARGS_PR}" "${PYTEST_ARGS_PUSH}")"
+          python_versions="$(pick "${PYTHON_VERSIONS}" "${PYTHON_VERSIONS_PUSH}")"
+          node_versions="$(pick "${NODE_VERSIONS}" "${NODE_VERSIONS_PUSH}")"
+          sync_args="$(pick "${SYNC_ARGS}" "${SYNC_ARGS_PUSH}")"
+          pytest_args="$(pick "${PYTEST_ARGS}" "${PYTEST_ARGS_PUSH}")"
 
-          if [[ "${event_kind}" == "pr" ]]; then
-            skip_python="${SKIP_PYTHON_PR}"
-            skip_node="${SKIP_NODE_PR}"
-          else
+          if [[ "${event_kind}" == "push" ]]; then
             skip_python="${SKIP_PYTHON_PUSH}"
             skip_node="${SKIP_NODE_PUSH}"
+          else
+            skip_python=false
+            skip_node=false
           fi
 
           run_python=false

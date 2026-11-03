@@ -84,7 +84,7 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 
 ### `ci.yml` inputs (optional)
 
-Shared baseline (used when event-specific override is empty):
+Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`):
 
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
@@ -97,16 +97,16 @@ Shared baseline (used when event-specific override is empty):
 | `pytest-args` | `-q` | `uv run pytest` |
 | `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
 
-Event-specific overrides (`pull_request` = `*-pr`; `push` / `workflow_dispatch` = `*-push`). Empty string → shared baseline. Defaults preserve full matrices on both events.
+Optional post-merge overrides (`push` / `workflow_dispatch` only). Empty string / `false` → shared default. Defaults preserve full matrices on both events.
 
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
-| `python-versions-pr` / `python-versions-push` | `""` | Override Python matrix |
-| `node-versions-pr` / `node-versions-push` | `""` | Override Node matrix |
-| `sync-args-pr` / `sync-args-push` | `""` | Override `uv sync` args |
-| `pytest-args-pr` / `pytest-args-push` | `""` | Override pytest args |
-| `skip-python-pr` / `skip-python-push` | `false` | Skip Python for that event only |
-| `skip-node-pr` / `skip-node-push` | `false` | Skip Node for that event only |
+| `python-versions-push` | `""` | Override Python matrix post-merge |
+| `node-versions-push` | `""` | Override Node matrix post-merge |
+| `sync-args-push` | `""` | Override `uv sync` args post-merge |
+| `pytest-args-push` | `""` | Override pytest args post-merge |
+| `skip-python-push` | `false` | Skip Python post-merge only |
+| `skip-node-push` | `false` | Skip Node post-merge only |
 
 Consumers must **not** inject `github.event_name` expressions for matrices — use these inputs.
 

@@ -43,9 +43,11 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
 ```
 
-### Pre-merge vs post-merge CI (no consumer expressions)
+### Shared CI + optional post-merge overrides (no consumer expressions)
 
-Set event-specific inputs on the reusable `ci.yml` — do **not** write
+Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-args`, …)
+run on **both** `pull_request` and `push` / `workflow_dispatch`. Optional `*-push` /
+`skip-*-push` override only post-merge when set — do **not** write
 `python-versions: ${{ github.event_name == 'push' && '…' || '…' }}` in the thin orchestrator.
 
 ```yaml
@@ -54,12 +56,14 @@ jobs:
     name: CI
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
     with:
-      python-versions: '["3.11","3.12","3.13"]'   # shared baseline (both events)
+      python-versions: '["3.11","3.12","3.13"]'   # shared (both events)
       python-versions-push: '["3.11","3.13"]'      # optional lighter post-merge
       skip-node-push: true                           # optional: skip Node on push only
 ```
 
-Empty `*-pr` / `*-push` strings inherit the shared baseline. Defaults keep the **full matrix on both** PR and push. `workflow_dispatch` uses the push knobs. Global `disable-python` / `disable-node` still kill a lane for every event; `skip-*-pr` / `skip-*-push` only skip that event.
+Empty `*-push` strings and false `skip-*-push` inherit the shared defaults. Defaults keep
+the **full matrix on both** PR and push. `workflow_dispatch` uses the push knobs.
+Global `disable-python` / `disable-node` kill a lane for every event.
 
 ### Security settings (step 5)
 

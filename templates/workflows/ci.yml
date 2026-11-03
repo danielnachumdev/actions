@@ -28,7 +28,7 @@ jobs:
     uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
     # with:  # all optional — defaults + auto-detect pyproject.toml / package.json
     #   working-directory: .
-    #   python-versions: '["3.11","3.12","3.13"]'          # both events (default)
+    #   python-versions: '["3.11","3.12","3.13"]'          # shared (both events)
     #   python-versions-push: '["3.11","3.13"]'             # optional lighter post-merge
     #   node-versions: '["20","22"]'
     #   sync-args: "--group dev"
@@ -36,12 +36,10 @@ jobs:
     #   disable-python: false                                 # never run lane (any event)
     #   disable-node: false
     #   skip-node-push: true                                  # skip Node on push only
-    #   # Event-specific overrides (empty = use shared baseline above):
-    #   # python-versions-pr / python-versions-push
-    #   # node-versions-pr / node-versions-push
-    #   # sync-args-pr / sync-args-push
-    #   # pytest-args-pr / pytest-args-push
-    #   # skip-python-pr / skip-python-push / skip-node-pr / skip-node-push
+    #   # Optional post-merge overrides (empty/false = shared default):
+    #   # python-versions-push / node-versions-push
+    #   # sync-args-push / pytest-args-push
+    #   # skip-python-push / skip-node-push
 
   semver:
     name: Semver

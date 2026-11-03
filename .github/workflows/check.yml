@@ -24,7 +24,7 @@ jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
-    # Event knobs (optional): python-versions-pr/push, skip-*-pr/push, etc.
+    # Event knobs (optional): shared defaults + *-push / skip-*-push.
     # Defaults keep the full matrix on both pull_request and push.
 
   semver:
