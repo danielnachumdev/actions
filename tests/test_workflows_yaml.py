@@ -247,3 +247,31 @@ class TestDogfoodCdWorkflow:
         job_if = data["jobs"]["semver"]["if"]
         assert "workflow_run.event == 'push'" in job_if
         assert "head_branch == 'main'" in job_if
+
+
+class TestDependabotAutoMergeWorkflow:
+    def test_is_reusable_workflow_call(self):
+        data = _load("dependabot-auto-merge.yml")
+        assert "workflow_call" in _on(data)
+        assert "pull_request" not in _on(data)
+        jobs = data["jobs"]
+        assert "merge" in jobs
+        merge_if = jobs["merge"]["if"]
+        assert "dependabot[bot]" in merge_if
+        step_run = jobs["merge"]["steps"][0]["run"]
+        assert "gh pr merge --auto --squash" in step_run
+
+    def test_template_ci_documents_opt_in_not_default(self):
+        """Consumers opt in via thin CI; template must not enable by default."""
+        text = (_TEMPLATES / "ci.yml").read_text(encoding="utf-8")
+        assert "dependabot-auto-merge.yml@v1" in text
+        data = _load("ci.yml", templates=True)
+        assert "dependabot-auto-merge" not in data["jobs"]
+
+    def test_dogfood_check_opts_in(self):
+        data = _load("check.yml")
+        job = data["jobs"]["dependabot-auto-merge"]
+        assert job["uses"] == "./.github/workflows/dependabot-auto-merge.yml"
+        assert "dependabot[bot]" in job["if"]
+        assert job["permissions"]["contents"] == "write"
+        assert job["permissions"]["pull-requests"] == "write"
