@@ -1,0 +1,64 @@
+# When Alembic revisions change vs base-ref, require base-ref is an ancestor of HEAD.
+#
+#   uses: danielnachumdev/actions/.github/workflows/rebase-guard.yml@latest
+
+name: rebase-guard
+
+on:
+  workflow_call:
+    inputs:
+      alembic-root:
+        description: Alembic script root; watches {alembic-root}/versions/
+        type: string
+        required: false
+        default: alembic
+      base-ref:
+        description: Git ref to rebase onto (e.g. origin/main)
+        type: string
+        required: false
+        default: origin/main
+      timeout-minutes:
+        description: Job timeout (minutes)
+        type: number
+        required: false
+        default: 10
+
+permissions:
+  contents: read
+
+jobs:
+  rebase-guard:
+    name: Rebase guard
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Rebase required when Alembic revisions change
+        env:
+          ALEMBIC_ROOT: ${{ inputs.alembic-root }}
+          BASE_REF: ${{ inputs.base-ref }}
+        run: |
+          set -euo pipefail
+          VERSIONS_DIR="${ALEMBIC_ROOT}/versions"
+          if [[ ! -d "${VERSIONS_DIR}" ]]; then
+            echo "rebase-guard: inactive (no ${VERSIONS_DIR})"
+            exit 0
+          fi
+          REMOTE="${BASE_REF%%/*}"
+          BRANCH="${BASE_REF#*/}"
+          git fetch "${REMOTE}" "${BRANCH}"
+          CHANGED="$(git diff --name-only "${BASE_REF}" HEAD -- "${VERSIONS_DIR}/")"
+          if [[ -z "${CHANGED}" ]]; then
+            echo "rebase-guard: inactive (no Alembic revision changes vs ${BASE_REF})"
+            exit 0
+          fi
+          echo "rebase-guard: Alembic revision changes vs ${BASE_REF}:"
+          echo "${CHANGED}"
+          git merge-base --is-ancestor "${BASE_REF}" HEAD || {
+            echo "::error::Alembic revisions changed but ${BASE_REF} is not an ancestor of HEAD — rebase onto ${BRANCH}"
+            exit 1
+          }
+          echo "rebase-guard: OK — ${BASE_REF} is an ancestor of HEAD"

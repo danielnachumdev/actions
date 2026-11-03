@@ -50,8 +50,10 @@ def _assert_with_timeout_wired(with_block: dict, input_key: str) -> None:
 class TestCiWorkflow:
     def test_parses_and_exposes_event_knobs(self):
         data = _load("ci.yml")
-        inputs = _on(data)["workflow_call"]["inputs"]
+        call = _on(data)["workflow_call"]
+        inputs = call["inputs"]
         for key in (
+            "standards-ref",
             "python-versions",
             "python-versions-push",
             "node-versions",
@@ -63,32 +65,77 @@ class TestCiWorkflow:
             "skip-node-push",
             "disable-python",
             "disable-node",
+            "disable-github-yaml",
+            "disable-rebase-guard",
+            "disable-terraform",
+            "disable-terraform-apply",
+            "disable-raft",
             "allow-empty",
+            "workload_identity_provider",
+            "service_account",
+            "raft-service",
+            "raft-git-repo",
         ):
             assert key in inputs, key
-        # No pre-merge-only overrides — shared defaults cover pull_request.
         for key in list(inputs):
             assert not key.endswith("-pr"), key
-            assert not key.startswith("skip-") or key.endswith("-push"), key
         assert inputs["python-versions-push"]["default"] == ""
+        assert inputs["node-versions"]["default"] == ""
+        assert inputs["sync-args"]["default"] == ""
         assert inputs["pytest-command"]["default"] == "pytest -q"
-        assert "pytest-command-push" not in inputs
-        assert inputs["skip-python-push"]["default"] is False
+        assert inputs["standards-ref"]["default"] == "latest"
+        assert call["secrets"]["VPS_SSH_KEY"]["required"] is False
         jobs = data["jobs"]
-        assert "detect" in jobs and "python" in jobs and "node" in jobs and "ci" in jobs
+        for name in (
+            "detect",
+            "python",
+            "node",
+            "github-yaml",
+            "rebase-guard",
+            "terraform-validate",
+            "terraform",
+            "raft",
+            "ci",
+        ):
+            assert name in jobs, name
         detect_outputs = jobs["detect"]["outputs"]
         for key in (
             "python_versions",
             "node_versions",
             "sync_args",
             "pytest_command",
+            "run_github_yaml",
+            "run_terraform_validate",
+            "run_terraform_apply",
+            "run_raft",
         ):
             assert key in detect_outputs, key
         python_with = jobs["python"]["with"]
         assert python_with["pytest-command"] == (
             "${{ needs.detect.outputs.pytest_command }}"
         )
-        assert "pytest-args" not in python_with
+        assert jobs["github-yaml"]["uses"] == "./.github/workflows/github-yaml.yml"
+        assert jobs["terraform-validate"]["uses"] == (
+            "./.github/workflows/terraform-validate.yml"
+        )
+        assert jobs["raft"]["secrets"]["VPS_SSH_KEY"] == (
+            "${{ secrets.VPS_SSH_KEY }}"
+        )
+
+    def test_detect_checks_out_standards_ref(self):
+        data = _load("ci.yml")
+        steps = data["jobs"]["detect"]["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        standards = by_name["Checkout standards (detect-layout)"]
+        assert standards["with"]["repository"] == "danielnachumdev/actions"
+        assert standards["with"]["ref"] == "${{ inputs.standards-ref }}"
+        assert standards["with"]["path"] == ".actions-standards"
+        layout = by_name["Detect layout + resolve event knobs"]
+        assert layout["uses"] == (
+            "./.actions-standards/.github/actions/detect-layout"
+        )
 
     def test_timeout_inputs_wired_to_jobs(self):
         data = _load("ci.yml")
@@ -97,6 +144,11 @@ class TestCiWorkflow:
             "detect-timeout-minutes",
             "python-timeout-minutes",
             "node-timeout-minutes",
+            "github-yaml-timeout-minutes",
+            "rebase-guard-timeout-minutes",
+            "terraform-validate-timeout-minutes",
+            "terraform-timeout-minutes",
+            "raft-timeout-minutes",
             "ci-timeout-minutes",
         ):
             _assert_timeout_input(inputs, key)
@@ -105,6 +157,44 @@ class TestCiWorkflow:
         _assert_job_timeout_wired(jobs["ci"], "ci-timeout-minutes")
         _assert_with_timeout_wired(jobs["python"]["with"], "python-timeout-minutes")
         _assert_with_timeout_wired(jobs["node"]["with"], "node-timeout-minutes")
+        _assert_with_timeout_wired(
+            jobs["github-yaml"]["with"], "github-yaml-timeout-minutes"
+        )
+
+
+class TestGithubYamlWorkflow:
+    def test_timeout_wired(self):
+        data = _load("github-yaml.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        _assert_timeout_input(inputs, "timeout-minutes")
+        _assert_job_timeout_wired(data["jobs"]["parse"], "timeout-minutes")
+
+
+class TestRebaseGuardWorkflow:
+    def test_timeout_and_defaults(self):
+        data = _load("rebase-guard.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        assert inputs["alembic-root"]["default"] == "alembic"
+        assert inputs["base-ref"]["default"] == "origin/main"
+        _assert_timeout_input(inputs, "timeout-minutes")
+        _assert_job_timeout_wired(data["jobs"]["rebase-guard"], "timeout-minutes")
+
+
+class TestTerraformValidateWorkflow:
+    def test_parses_no_wif(self):
+        data = _load("terraform-validate.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        assert "workload_identity_provider" not in inputs
+        assert inputs["working-directory"]["default"] == "terraform"
+        assert inputs["terraform-version"]["default"] == "1.9.8"
+        _assert_timeout_input(inputs, "timeout-minutes")
+        job = data["jobs"]["validate"]
+        _assert_job_timeout_wired(job, "timeout-minutes")
+        step_names = [
+            s.get("name", "") for s in job["steps"] if isinstance(s, dict)
+        ]
+        assert "Authenticate to Google Cloud" not in step_names
+        assert "Validate modules" in step_names
 
 
 class TestPythonWorkflow:
@@ -440,7 +530,8 @@ class TestTerraformWorkflow:
         assert "workload_identity_provider" in job["with"]
         assert "service_account" in job["with"]
         howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
-        assert "### Terraform plan / apply (optional)" in howto
+        assert "### Terraform (auto + optional direct)" in howto
+        assert "terraform-validate" in howto
         assert "terraform.yml@latest" in howto
         assert "skip-apply-push" in howto
         assert "plan only" in howto.lower() or "plan-only" in howto.lower()
@@ -561,6 +652,9 @@ class TestDependabotAutoMergeWorkflow:
 
     def test_dogfood_check_opts_in(self):
         data = _load("check.yml")
+        ci = data["jobs"]["ci"]
+        assert ci["uses"] == "./.github/workflows/ci.yml"
+        assert ci["with"]["standards-ref"] == "${{ github.sha }}"
         job = data["jobs"]["dependabot-auto-merge"]
         assert job["uses"] == "./.github/workflows/dependabot-auto-merge.yml"
         assert job["name"] == "Merge Dependabot PR"
