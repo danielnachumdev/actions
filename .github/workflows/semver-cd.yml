@@ -41,6 +41,12 @@ on:
         description: If true, upload the release wheel to PyPI after GitHub Release
         type: boolean
         default: false
+      pypi-auth:
+        description: >-
+          PyPI auth method when publish-pypi is true: trusted-publishing (OIDC)
+          or token (secrets.PYPI_API_TOKEN). Caller chooses; no auto-fallback.
+        type: string
+        default: "trusted-publishing"
       retags:
         description: >-
           JSON array of floating tag names to force-move to the release SHA after
@@ -61,7 +67,7 @@ on:
         default: 10
     secrets:
       PYPI_API_TOKEN:
-        description: Optional PyPI API token (fallback when not using Trusted Publishing)
+        description: PyPI API token when pypi-auth is token (unused for trusted-publishing)
         required: false
     outputs:
       skip:
@@ -317,7 +323,7 @@ jobs:
       timeout-minutes: ${{ inputs.retag-timeout-minutes }}
 
   # Opt-in: same wheel as the GitHub Release → PyPI.
-  # Prefer Trusted Publishing (OIDC). Fallback: secrets.PYPI_API_TOKEN.
+  # Auth is caller-chosen via pypi-auth (trusted-publishing | token); no auto-fallback.
   # Runs in parallel with retag (both only need semver).
   pypi:
     name: PyPI
@@ -352,25 +358,27 @@ jobs:
 
       - name: Publish to PyPI
         env:
+          PYPI_AUTH: ${{ inputs.pypi-auth }}
           PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           set -euo pipefail
           wheel="$(ls -1 dist/*.whl | head -1)"
           [[ -n "${wheel}" && -f "${wheel}" ]]
-          # Prefer Trusted Publishing so first publish works with a pending
-          # publisher even when an unrelated project-scoped token is present.
-          set +e
-          echo "Publishing ${wheel} with Trusted Publishing (OIDC)"
-          uv publish "${wheel}" --trusted-publishing always
-          status=$?
-          set -e
-          if [[ "${status}" -eq 0 ]]; then
-            exit 0
-          fi
-          if [[ -n "${PYPI_TOKEN}" ]]; then
-            echo "OIDC publish failed (exit ${status}); falling back to API token"
-            uv publish "${wheel}" --token "${PYPI_TOKEN}"
-          else
-            echo "OIDC publish failed (exit ${status}) and no PYPI_API_TOKEN configured" >&2
-            exit "${status}"
-          fi
+          case "${PYPI_AUTH}" in
+            trusted-publishing)
+              echo "Publishing ${wheel} with Trusted Publishing (OIDC)"
+              uv publish "${wheel}" --trusted-publishing always
+              ;;
+            token)
+              if [[ -z "${PYPI_TOKEN}" ]]; then
+                echo "pypi-auth=token requires secrets.PYPI_API_TOKEN" >&2
+                exit 1
+              fi
+              echo "Publishing ${wheel} with API token"
+              uv publish "${wheel}" --token "${PYPI_TOKEN}"
+              ;;
+            *)
+              echo "Invalid pypi-auth='${PYPI_AUTH}' (expected trusted-publishing or token)" >&2
+              exit 1
+              ;;
+          esac

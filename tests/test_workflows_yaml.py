@@ -247,18 +247,23 @@ class TestSemverCdWorkflow:
             "Checkout caller at SHA"
         )
 
-    def test_pypi_prefers_trusted_publishing_then_token(self):
-        """OIDC first so pending publishers work despite unrelated project tokens."""
+    def test_pypi_auth_input_is_caller_chosen(self):
+        """Consuming repo picks trusted-publishing or token; no auto-fallback."""
         data = _load("semver-cd.yml")
+        inputs = _on(data)["workflow_call"]["inputs"]
+        assert inputs["pypi-auth"]["default"] == "trusted-publishing"
         steps = data["jobs"]["pypi"]["steps"]
         by_name = {
             s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
         }
-        publish = by_name["Publish to PyPI"]["run"]
-        oidc = publish.index("--trusted-publishing always")
-        token = publish.index("--token")
-        assert oidc < token
-        assert "falling back to API token" in publish
+        publish = by_name["Publish to PyPI"]
+        assert publish["env"]["PYPI_AUTH"] == "${{ inputs.pypi-auth }}"
+        run = publish["run"]
+        assert "trusted-publishing)" in run
+        assert "token)" in run
+        assert "falling back" not in run
+        assert "--trusted-publishing always" in run
+        assert "--token" in run
 
 
 class TestDogfoodCdWorkflow:
