@@ -8,6 +8,10 @@
 # skipped, the caller if must include always() && needs.<id>.result == 'success'
 # or GitHub skips this job while CI is green (see HOW-TO-USE.md).
 #
+# PRs that edit `.github/workflows/**` cannot be merged with GITHUB_TOKEN (no
+# workflows scope on that token). Those merges are skipped with a notice so the
+# job stays green; merge them manually (or with a PAT outside this workflow).
+#
 # If branch protection requires checks that are not sibling jobs in the same
 # workflow, those still must be green before merge can succeed — represent them
 # via needs: or keep them out of required checks for Dependabot.
@@ -44,4 +48,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          if gh pr diff "$PR_URL" --name-only | grep -q '^\.github/workflows/'; then
+            echo "::notice::Skipping merge: PR updates workflow files; GITHUB_TOKEN cannot merge those changes. Merge manually."
+            exit 0
+          fi
           gh pr merge --squash --delete-branch "$PR_URL"
