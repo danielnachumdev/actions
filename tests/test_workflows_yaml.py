@@ -119,6 +119,28 @@ class TestSemverCiWorkflow:
         _assert_timeout_input(inputs, "timeout-minutes")
         _assert_job_timeout_wired(data["jobs"]["semver"], "timeout-minutes")
 
+    def test_hardens_standards_ref_checkout(self):
+        """workflow_dispatch callers can write default-branch cache; guard first."""
+        data = _load("semver-ci.yml")
+        steps = data["jobs"]["semver"]["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        assert "Guard standards ref" in by_name
+        guard_run = by_name["Guard standards ref"]["run"]
+        assert "STANDARDS_REPO" in by_name["Guard standards ref"]["env"]
+        assert "danielnachumdev/actions" in by_name["Guard standards ref"]["env"][
+            "STANDARDS_REPO"
+        ]
+        assert "v[0-9]+" in guard_run
+        assert "0-9a-f" in guard_run
+        assert 'repos/${STANDARDS_REPO}/commits/${REF}' in guard_run
+        standards = by_name["Checkout standards"]
+        assert standards["with"]["ref"] == "${{ inputs.standards-ref }}"
+        assert standards["with"]["persist-credentials"] is False
+        names = [s.get("name", "") for s in steps if isinstance(s, dict)]
+        assert names.index("Guard standards ref") < names.index("Checkout standards")
+
 
 class TestRetagWorkflow:
     def test_parses_and_requires_sha(self):

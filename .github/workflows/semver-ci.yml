@@ -27,12 +27,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
+      # Callers may sit under write-capable default-branch triggers (e.g.
+      # workflow_dispatch). Restrict standards-ref before checkout so an
+      # arbitrary branch name cannot materialize untrusted scripts; drop
+      # persisted creds so executed code cannot reuse the job token from .git.
+      - name: Guard standards ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.standards-ref }}
+          STANDARDS_REPO: danielnachumdev/actions
+        run: |
+          set -euo pipefail
+          # Allow floating major / exact semver / latest, or a commit SHA.
+          # Reject arbitrary branch names (feature/*, attacker-chosen refs).
+          if [[ ! "${REF}" =~ ^(latest|v[0-9]+|v[0-9]+\.[0-9]+\.[0-9]+)$ ]] \
+            && [[ ! "${REF}" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "FAIL: standards-ref must be a release tag (vN / vN.N.N / latest) or commit SHA, got: ${REF}"
+            exit 1
+          fi
+          sha="$(gh api "repos/${STANDARDS_REPO}/commits/${REF}" --jq .sha)"
+          echo "standards-ref ${REF} resolves to ${sha} on ${STANDARDS_REPO}"
+
       - name: Checkout standards
         uses: actions/checkout@v7
         with:
           repository: danielnachumdev/actions
           ref: ${{ inputs.standards-ref }}
           path: .actions-standards
+          persist-credentials: false
 
       - name: Require exactly one bump / noBump label
         env:
