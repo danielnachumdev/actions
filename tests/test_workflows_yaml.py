@@ -290,8 +290,16 @@ class TestDependabotAutoMergeWorkflow:
         assert step["name"] == "Merge Dependabot PR"
         assert "Enable" not in step["name"]
         step_run = step["run"]
+        assert "gh pr diff \"$PR_URL\" --name-only" in step_run
+        assert "Skipping merge: PR updates workflow files" in step_run
+        assert "gh pr view \"$PR_URL\" --json headRefOid --jq .headRefOid" in step_run
+        assert 'if [ "$HEAD" != "$GITHUB_SHA" ]' in step_run
+        assert "skipping merge so newer CI can win" in step_run
         assert "gh pr merge --squash --delete-branch" in step_run
         assert "--auto" not in step_run
+        # Workflow-file skip and SHA guard must both precede merge.
+        assert step_run.index(".github/workflows/") < step_run.index("gh pr merge")
+        assert step_run.index("headRefOid") < step_run.index("gh pr merge")
 
     def test_template_ci_documents_opt_in_not_default(self):
         """Consumers opt in via thin CI; template must not enable by default."""
@@ -320,7 +328,11 @@ class TestDependabotAutoMergeWorkflow:
         assert "**must** declare `needs:`" in howto
         assert "needs: [ci, semver]" in howto
         assert "aggregate" in howto.lower()
+        assert "SHA guard before merge" in howto
+        assert "headRefOid" in howto
         template = (_TEMPLATES / "ci.yml").read_text(encoding="utf-8")
         assert "aggregate success job" in template
         reusable = (_WORKFLOWS / "dependabot-auto-merge.yml").read_text(encoding="utf-8")
         assert "aggregate" in reusable
+        assert "headRefOid" in reusable
+        assert "github.sha" in reusable
