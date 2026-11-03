@@ -179,7 +179,7 @@ jobs:
             echo "noBump: not creating a GitHub Release."
           fi
 
-      - uses: astral-sh/setup-uv@v10.0.0
+      - uses: astral-sh/setup-uv@v10.3.3
         if: steps.already.outputs.skip != 'true' && steps.bump.outputs.skip != 'true' && inputs.dry-run != true
         with:
           python-version: ${{ inputs.python-version }}
