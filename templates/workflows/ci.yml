@@ -54,7 +54,9 @@ jobs:
       # timeout-minutes: 5
 
   # Opt-in: merge Dependabot PRs after sibling CI jobs pass (default off).
-  # Must needs: every PR job that must pass first so this runs last.
+  # Must needs: every PR job that must pass first so this runs last in the
+  # workflow graph (thin CI: needs: [ci, semver]). Custom orchestrators with an
+  # aggregate success job (e.g. raft): needs: that aggregate instead.
   # If classic branch protection requires code-owner reviews with review count 0,
   # set require_code_owner_reviews=false so Dependabot can land after required checks.
   # dependabot-auto-merge:

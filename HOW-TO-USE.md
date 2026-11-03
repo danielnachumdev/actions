@@ -197,7 +197,9 @@ Verify: `gh api repos/OWNER/REPO --jq .security_and_analysis` and vulnerability-
 
 Optional job on the thin CI orchestrator (commented example in [`templates/workflows/ci.yml`](templates/workflows/ci.yml)). It **merges** the Dependabot PR (squash + delete branch) once sibling jobs have already passed — it does not enable GitHub’s “Allow auto-merge” queue.
 
-**Consumers must** set `needs:` to every PR job that must pass first so this job runs last:
+**Gate so merge runs last.** The opt-in job **must** declare `needs:` listing every PR job that must succeed first. Without that edge, GitHub schedules it in parallel with CI; it can fail (or merge too early) while Unit/E2E/Semver are still running. `needs:` is what puts Dependabot merge last in the workflow graph.
+
+Thin CI (this repo’s template / dogfood shape) — list every sibling PR job:
 
 ```yaml
 dependabot-auto-merge:
@@ -209,6 +211,8 @@ dependabot-auto-merge:
     pull-requests: write
   uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 ```
+
+Custom orchestrators (e.g. raft with Unit + E2E behind one aggregate success job): `needs:` that aggregate job instead of (or in addition to) leaf jobs — e.g. `needs: [ci]` when `ci` only succeeds after all required lanes pass. Same rule: merge must not start until every required PR check in this workflow has succeeded.
 
 Also:
 
