@@ -11,7 +11,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 | ---- | ------ |
 | Role | Shared reusable workflows + release scripts + templates; **also a consumer** of those blocks |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml`, `python.yml`, `semver-ci.yml`, `semver-cd.yml` (`workflow_call` only; optional PyPI job) |
+| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml` (`workflow_call` only; optional PyPI job) |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
 | Pinning (consumers) | **`@v1`** (floating major, moved by `semver-cd` on each release) |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
@@ -19,6 +19,7 @@ Pitch: [`README.md`](README.md). Consumer adoption checklist: [`HOW-TO-USE.md`](
 ```text
 .github/workflows/ci.yml         # reusable CI entry (workflow_call only)
 .github/workflows/python.yml     # uv pytest matrix lane
+.github/workflows/node.yml       # Node/TS lint+test matrix lane
 .github/workflows/semver-ci.yml  # CI stage: validate bump label on PR
 .github/workflows/semver-cd.yml  # CD stage: bump → wheel → Release → vMAJOR → optional PyPI
 .github/workflows/check.yml      # dogfood thin CI (name: CI)
@@ -79,10 +80,12 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | ----- | ------- | ------- |
 | `working-directory` | `.` | App root |
 | `pyproject-path` | `pyproject.toml` | Presence → Python lane |
+| `package-json-path` | `package.json` | Presence → Node lane |
 | `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON |
+| `node-versions` | `["20","22"]` | Matrix JSON |
 | `sync-args` | `--group dev` | `uv sync` |
 | `pytest-args` | `-q` | `uv run pytest` |
-| `disable-python` / `allow-empty` | `false` | Lane toggles |
+| `disable-python` / `disable-node` / `allow-empty` | `false` | Lane toggles |
 
 ### `semver-cd.yml` inputs
 

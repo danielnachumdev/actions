@@ -5,7 +5,7 @@
 # Consumers copy templates/workflows/ci.yml (thin orchestrator).
 #
 # Note: GitHub forbids subdirectories under .github/workflows/ for reusable
-# workflows. Organize with short flat names (ci, python, semver-ci, semver-cd).
+# workflows. Organize with short flat names (ci, python, node, semver-ci, semver-cd).
 # Composite actions MAY live under .github/actions/<name>/ (see detect-layout).
 
 name: ci
@@ -21,10 +21,18 @@ on:
         description: pyproject.toml path relative to working-directory
         type: string
         default: "pyproject.toml"
+      package-json-path:
+        description: package.json path relative to working-directory
+        type: string
+        default: "package.json"
       python-versions:
         description: JSON array of Python versions
         type: string
         default: '["3.11","3.12","3.13"]'
+      node-versions:
+        description: JSON array of Node versions
+        type: string
+        default: '["20","22"]'
       sync-args:
         description: Extra args to uv sync
         type: string
@@ -35,6 +43,10 @@ on:
         default: "-q"
       disable-python:
         description: If true, never run the Python lane
+        type: boolean
+        default: false
+      disable-node:
+        description: If true, never run the Node lane
         type: boolean
         default: false
       allow-empty:
@@ -52,6 +64,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run_python: ${{ steps.layout.outputs.run_python }}
+      run_node: ${{ steps.layout.outputs.run_node }}
       working_directory: ${{ steps.layout.outputs.working_directory }}
     steps:
       - uses: actions/checkout@v7
@@ -62,7 +75,9 @@ jobs:
         env:
           WORKING_DIRECTORY: ${{ inputs.working-directory || '.' }}
           PYPROJECT_PATH: ${{ inputs.pyproject-path || 'pyproject.toml' }}
+          PACKAGE_JSON_PATH: ${{ inputs.package-json-path || 'package.json' }}
           DISABLE_PYTHON: ${{ inputs.disable-python == true && 'true' || 'false' }}
+          DISABLE_NODE: ${{ inputs.disable-node == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
           root="${WORKING_DIRECTORY:-.}"
@@ -70,15 +85,22 @@ jobs:
           [[ -z "${root}" ]] && root="."
           pyproject="${root%/}/${PYPROJECT_PATH}"
           pyproject="${pyproject#./}"
+          package_json="${root%/}/${PACKAGE_JSON_PATH}"
+          package_json="${package_json#./}"
 
           run_python=false
           if [[ "${DISABLE_PYTHON}" != "true" && -f "${pyproject}" ]]; then
             run_python=true
           fi
+          run_node=false
+          if [[ "${DISABLE_NODE}" != "true" && -f "${package_json}" ]]; then
+            run_node=true
+          fi
 
           echo "working_directory=${root}" >> "$GITHUB_OUTPUT"
           echo "run_python=${run_python}" >> "$GITHUB_OUTPUT"
-          echo "detect: root=${root} pyproject=${pyproject} run_python=${run_python}"
+          echo "run_node=${run_node}" >> "$GITHUB_OUTPUT"
+          echo "detect: root=${root} pyproject=${pyproject} package_json=${package_json} run_python=${run_python} run_node=${run_node}"
 
   python:
     name: Python
@@ -91,12 +113,21 @@ jobs:
       sync-args: ${{ inputs.sync-args || '--group dev' }}
       pytest-args: ${{ inputs.pytest-args || '-q' }}
 
+  node:
+    name: Node
+    needs: [detect]
+    if: needs.detect.outputs.run_node == 'true'
+    uses: ./.github/workflows/node.yml
+    with:
+      working-directory: ${{ needs.detect.outputs.working_directory }}
+      node-versions: ${{ inputs.node-versions || '["20","22"]' }}
+
   # Leaf name "CI" → consumer job named CI reports check "CI / CI".
   # !cancelled(): skip gate when concurrency cancels an in-flight run (avoids a
   # false FAILURE that blocks merge while the surviving run is green).
   ci:
     name: CI
-    needs: [detect, python]
+    needs: [detect, python, node]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -105,17 +136,27 @@ jobs:
         env:
           RUN_PYTHON: ${{ needs.detect.outputs.run_python }}
           PYTHON_RESULT: ${{ needs.python.result }}
+          RUN_NODE: ${{ needs.detect.outputs.run_node }}
+          NODE_RESULT: ${{ needs.node.result }}
           ALLOW_EMPTY: ${{ inputs.allow-empty == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
-          echo "run_python=${RUN_PYTHON} python_result=${PYTHON_RESULT} allow_empty=${ALLOW_EMPTY}"
+          echo "run_python=${RUN_PYTHON} python_result=${PYTHON_RESULT} run_node=${RUN_NODE} node_result=${NODE_RESULT} allow_empty=${ALLOW_EMPTY}"
+          ok=false
           if [[ "${RUN_PYTHON}" == "true" ]]; then
             [[ "${PYTHON_RESULT}" == "success" ]]
+            ok=true
+          fi
+          if [[ "${RUN_NODE}" == "true" ]]; then
+            [[ "${NODE_RESULT}" == "success" ]]
+            ok=true
+          fi
+          if [[ "${ok}" == "true" ]]; then
             exit 0
           fi
           if [[ "${ALLOW_EMPTY}" == "true" ]]; then
             echo "OK empty (no lanes)"
             exit 0
           fi
-          echo "FAIL: no CI lane selected (set allow-empty: true or add pyproject.toml)"
+          echo "FAIL: no CI lane selected (set allow-empty: true or add pyproject.toml / package.json)"
           exit 1

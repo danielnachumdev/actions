@@ -1,0 +1,86 @@
+# Node/TS lane. Prefer calling ci.yml unless you need this alone.
+#
+#   uses: danielnachumdev/actions/.github/workflows/node.yml@v1
+#
+# Install: npm ci | pnpm i --frozen-lockfile | yarn --frozen-lockfile | npm install
+# Runs package.json scripts when present: lint, then test (fail if neither exists).
+
+name: node
+
+on:
+  workflow_call:
+    inputs:
+      node-versions:
+        description: JSON array of Node versions
+        type: string
+        default: '["20","22"]'
+      working-directory:
+        description: Directory containing package.json
+        type: string
+        default: "."
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ${{ fromJSON(inputs.node-versions) }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          if [[ -f pnpm-lock.yaml ]]; then
+            corepack enable
+            corepack prepare pnpm@latest --activate
+            pnpm install --frozen-lockfile
+          elif [[ -f yarn.lock ]]; then
+            corepack enable
+            corepack prepare yarn@stable --activate
+            yarn install --frozen-lockfile
+          elif [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint + test
+        run: |
+          set -euo pipefail
+          has_lint="$(node -e "const p=require('./package.json'); process.stdout.write(p.scripts&&p.scripts.lint?'true':'false')")"
+          has_test="$(node -e "const p=require('./package.json'); process.stdout.write(p.scripts&&p.scripts.test?'true':'false')")"
+          echo "scripts: lint=${has_lint} test=${has_test}"
+          if [[ "${has_lint}" != "true" && "${has_test}" != "true" ]]; then
+            echo "FAIL: package.json needs a lint and/or test script"
+            exit 1
+          fi
+          run_script() {
+            local name="$1"
+            if [[ -f pnpm-lock.yaml ]]; then
+              pnpm run "${name}"
+            elif [[ -f yarn.lock ]]; then
+              yarn run "${name}"
+            else
+              npm run "${name}"
+            fi
+          }
+          if [[ "${has_lint}" == "true" ]]; then
+            run_script lint
+          fi
+          if [[ "${has_test}" == "true" ]]; then
+            run_script test
+          fi
