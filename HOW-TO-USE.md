@@ -4,7 +4,7 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hy
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
 
@@ -49,7 +49,46 @@ uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
 uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
 # optional Cloud Build / Cloud Run deploy (from thin CD — see below):
 uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+# optional Terraform plan / apply (PR plan; post-merge apply — see below):
+uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
 ```
+
+### Terraform plan / apply (optional)
+
+Reusable job: WIF auth → `setup-terraform` → `fmt` → `init` → `plan`, then **`apply` post-merge** by default. Path filters and app deploys stay in the **caller**.
+
+| Event | Default |
+| ----- | ------- |
+| `pull_request` | plan only (`fmt` + `init` + `plan`) |
+| `push` | plan, then apply (unless `skip-apply-push: true`) |
+| `workflow_dispatch` | plan, then apply |
+| any + `apply: true` | force apply (including on PR) |
+
+Copy [`templates/workflows/terraform.yml`](templates/workflows/terraform.yml) or call from a thin deploy / CI workflow:
+
+```yaml
+jobs:
+  terraform:
+    name: Terraform
+    permissions:
+      contents: read
+      id-token: write
+    uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+    with:
+      workload_identity_provider: projects/…/providers/github
+      service_account: terraform-sa@PROJECT_ID.iam.gserviceaccount.com
+      # working-directory: terraform
+      # terraform-version: "1.9.8"
+      # skip-apply-push: ${{ vars.ENABLE_GHA_CD != 'true' }}  # optional CD gate
+      # init-args: ""
+      # plan-args: ""
+      # skip-fmt: false
+      # timeout-minutes: 30
+```
+
+Caller needs `permissions.id-token: write` (and `contents: read`). Same WIF caveat as Cloud Run: pool trust on the **calling** repo (`attribute.repository`), not `job_workflow_ref` to this reusable file.
+
+When apply runs, plan writes `-out=tfplan` and apply uses that file. `TF_IN_AUTOMATION=true` is set. Do **not** put `github.event_name` apply gates in the thin orchestrator — use `skip-apply-push` / `apply` instead.
 
 ### Raft VPS apply / redeploy (optional)
 
@@ -196,6 +235,7 @@ Override via `workflow_call` inputs when a lane needs more (or less) time:
 | `retag.yml` | `timeout-minutes` (10) |
 | `cloudrun-deploy.yml` | `timeout-minutes` (45) |
 | `raft-deploy.yml` | `timeout-minutes` (15); SSH `command_timeout` default `10m` |
+| `terraform.yml` | `timeout-minutes` (30) |
 
 ```yaml
 # example: longer Python matrix cells

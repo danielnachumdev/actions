@@ -357,6 +357,96 @@ class TestRaftDeployWorkflow:
         assert "vars.VPS_HOST" in howto
 
 
+class TestTerraformWorkflow:
+    def test_parses_required_inputs_and_defaults(self):
+        data = _load("terraform.yml")
+        assert "workflow_call" in _on(data)
+        inputs = _on(data)["workflow_call"]["inputs"]
+        for key in ("workload_identity_provider", "service_account"):
+            assert inputs[key]["required"] is True, key
+        assert inputs["working-directory"]["default"] == "terraform"
+        assert inputs["terraform-version"]["default"] == "1.9.8"
+        assert inputs["ref"]["default"] == ""
+        assert inputs["init-args"]["default"] == ""
+        assert inputs["plan-args"]["default"] == ""
+        assert inputs["apply"]["default"] is False
+        assert inputs["skip-apply-push"]["default"] is False
+        assert inputs["skip-fmt"]["default"] is False
+        _assert_timeout_input(inputs, "timeout-minutes")
+        assert inputs["timeout-minutes"]["default"] == 30
+        assert set(inputs) == {
+            "workload_identity_provider",
+            "service_account",
+            "working-directory",
+            "terraform-version",
+            "ref",
+            "init-args",
+            "plan-args",
+            "apply",
+            "skip-apply-push",
+            "skip-fmt",
+            "timeout-minutes",
+        }
+        perms = data["permissions"]
+        assert perms["id-token"] == "write"
+        assert perms["contents"] == "read"
+
+    def test_plan_always_apply_gated_and_timeout_wired(self):
+        data = _load("terraform.yml")
+        job = data["jobs"]["terraform"]
+        _assert_job_timeout_wired(job, "timeout-minutes")
+        assert job["defaults"]["run"]["working-directory"] == (
+            "${{ inputs.working-directory }}"
+        )
+        assert job["env"]["TF_IN_AUTOMATION"] == "true"
+        steps = job["steps"]
+        by_name = {
+            s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
+        }
+        assert "Authenticate to Google Cloud" in by_name
+        assert by_name["Authenticate to Google Cloud"]["uses"].startswith(
+            "google-github-actions/auth@"
+        )
+        assert by_name["Setup Terraform"]["uses"].startswith(
+            "hashicorp/setup-terraform@"
+        )
+        assert by_name["Setup Terraform"]["with"]["terraform_wrapper"] is False
+        assert by_name["Terraform fmt"]["run"] == (
+            "terraform fmt -check -recursive"
+        )
+        assert "skip-fmt" in by_name["Terraform fmt"]["if"]
+        plan = by_name["Terraform plan"]
+        assert "terraform plan" in plan["run"]
+        assert "-out=tfplan" in plan["run"]
+        assert "DO_APPLY" in plan["env"]
+        apply = by_name["Terraform apply"]
+        apply_if = apply["if"]
+        assert "inputs.apply" in apply_if
+        assert "workflow_dispatch" in apply_if
+        assert "skip-apply-push" in apply_if
+        assert "pull_request" not in apply_if
+        assert apply["run"] == (
+            "terraform apply -auto-approve -input=false tfplan"
+        )
+
+    def test_template_pins_v1_and_howto_documents_lifecycle(self):
+        text = (_TEMPLATES / "terraform.yml").read_text(encoding="utf-8")
+        assert "terraform.yml@v1" in text
+        assert "id-token: write" in text
+        assert "pull_request" in text
+        data = _load("terraform.yml", templates=True)
+        job = data["jobs"]["terraform"]
+        assert job["uses"].endswith("terraform.yml@v1")
+        assert "workload_identity_provider" in job["with"]
+        assert "service_account" in job["with"]
+        howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
+        assert "### Terraform plan / apply (optional)" in howto
+        assert "terraform.yml@v1" in howto
+        assert "skip-apply-push" in howto
+        assert "plan only" in howto.lower() or "plan-only" in howto.lower()
+        assert "attribute.repository" in howto
+
+
 class TestCloudrunDeployWorkflow:
     def test_parses_and_requires_core_inputs(self):
         data = _load("cloudrun-deploy.yml")
