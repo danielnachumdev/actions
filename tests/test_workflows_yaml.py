@@ -59,8 +59,6 @@ class TestCiWorkflow:
             "sync-args",
             "sync-args-push",
             "pytest-command",
-            "pytest-args",
-            "pytest-args-push",
             "skip-python-push",
             "skip-node-push",
             "disable-python",
@@ -84,14 +82,13 @@ class TestCiWorkflow:
             "node_versions",
             "sync_args",
             "pytest_command",
-            "pytest_args",
         ):
             assert key in detect_outputs, key
         python_with = jobs["python"]["with"]
         assert python_with["pytest-command"] == (
             "${{ needs.detect.outputs.pytest_command }}"
         )
-        assert python_with["pytest-args"] == "${{ needs.detect.outputs.pytest_args }}"
+        assert "pytest-args" not in python_with
 
     def test_timeout_inputs_wired_to_jobs(self):
         data = _load("ci.yml")
@@ -121,14 +118,12 @@ class TestPythonWorkflow:
         data = _load("python.yml")
         inputs = _on(data)["workflow_call"]["inputs"]
         assert inputs["pytest-command"]["default"] == "pytest ."
-        assert inputs["pytest-args"]["default"] == "-q"
+        assert "pytest-args" not in inputs
         steps = data["jobs"]["test"]["steps"]
         pytest_step = next(
             s for s in steps if isinstance(s, dict) and s.get("name") == "Pytest"
         )
-        assert pytest_step["run"] == (
-            "uv run ${{ inputs.pytest-command }} ${{ inputs.pytest-args }}"
-        )
+        assert pytest_step["run"] == "uv run ${{ inputs.pytest-command }}"
         assert data["jobs"]["test"]["defaults"]["run"]["working-directory"] == (
             "${{ inputs.working-directory }}"
         )

@@ -21,14 +21,10 @@ on:
         default: "--group dev"
       pytest-command:
         description: >-
-          Pytest invocation run under `uv run` in working-directory.
-          Override to target a suite (e.g. `pytest tests/unit`).
+          Full pytest invocation under `uv run` in working-directory
+          (include flags here, e.g. `pytest . -q`). Default `pytest .`.
         type: string
         default: "pytest ."
-      pytest-args:
-        description: Extra args appended after pytest-command
-        type: string
-        default: "-q"
       timeout-minutes:
         description: Job timeout for each matrix cell (minutes)
         type: number
@@ -57,4 +53,4 @@ jobs:
       - name: Install package + deps
         run: uv sync ${{ inputs.sync-args }}
       - name: Pytest
-        run: uv run ${{ inputs.pytest-command }} ${{ inputs.pytest-args }}
+        run: uv run ${{ inputs.pytest-command }}

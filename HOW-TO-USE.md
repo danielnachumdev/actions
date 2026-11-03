@@ -79,8 +79,8 @@ Caller needs `permissions: contents: write`. Inputs: `sha`, `tags`, `dry-run`.
 
 ### Shared CI + optional post-merge overrides (no consumer expressions)
 
-Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-command`,
-`pytest-args`, …) run on **both** `pull_request` and `push` / `workflow_dispatch`.
+Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-command`, …)
+run on **both** `pull_request` and `push` / `workflow_dispatch`.
 Optional `*-push` / `skip-*-push` override only post-merge when set — do **not** write
 `python-versions: ${{ github.event_name == 'push' && '…' || '…' }}` in the thin orchestrator.
 
@@ -97,10 +97,10 @@ jobs:
 
 ### Override the pytest command
 
-Default Python lane runs `uv run pytest . -q` in `working-directory` on **both**
-PR and push. Pass `pytest-command` to change the invocation (suite path, markers,
-etc.) for both events; `pytest-args` are still appended (optional `pytest-args-push`
-only). For several suites, call `python.yml` once per job:
+Default Python lane runs `uv run pytest .` in `working-directory` on **both** PR
+and push. Pass `pytest-command` for the full invocation (suite path, markers, flags)
+— there is no separate `pytest-args` input. For several suites, call `python.yml`
+once per job:
 
 ```yaml
 jobs:
@@ -108,13 +108,12 @@ jobs:
     name: Unit
     uses: danielnachumdev/actions/.github/workflows/python.yml@v1
     with:
-      pytest-command: pytest tests/unit
+      pytest-command: pytest tests/unit -q
   integration:
     name: Integration
     uses: danielnachumdev/actions/.github/workflows/python.yml@v1
     with:
-      pytest-command: pytest tests/integration
-      pytest-args: "-q -m integration"
+      pytest-command: pytest tests/integration -q -m integration
 ```
 
 Via `ci.yml` (single lane):
