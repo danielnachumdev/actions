@@ -13,7 +13,7 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
 | Stage | Workflow | Behavior |
 | ----- | -------- | -------- |
 | **CI** (PR) | `semver-ci.yml` | Fail unless exactly one of `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
-| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → move floating `vMAJOR` |
+| **CD** (after CI on `main`) | `semver-cd.yml` | Read merged PR label → bump / skip → wheel → GitHub Release → move floating `vMAJOR` → optional PyPI |
 
 ## Wire-up
 
@@ -30,6 +30,13 @@ uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 ```
 
+### Optional PyPI (same wheel as the GitHub Release)
+
+1. On PyPI: add a **Trusted Publisher** for the repo / workflow `cd.yml` / environment (if any).  
+2. In thin `cd.yml`: `permissions.id-token: write`, `publish-pypi: true`, optional `pypi-environment: pypi`.  
+3. Token fallback: pass `secrets.PYPI_API_TOKEN` (or `secrets: inherit`) instead of OIDC.
+
+Default remains **GitHub Release only** (`publish-pypi: false`).
 ## Verify
 
 ```bash

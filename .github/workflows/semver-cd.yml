@@ -1,4 +1,5 @@
 # Semver at CD — bump from PR labels, build wheel, GitHub Release.
+# Optional: publish the same wheel to PyPI (Trusted Publishing or token).
 #   uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 #
 # Allowed labels (from merged PR): noBump | bumpPatch | bumpMinor | bumpMajor
@@ -35,6 +36,20 @@ on:
         description: Optional latest tag override (empty = GitHub Release / pyproject seed)
         type: string
         default: ""
+      publish-pypi:
+        description: If true, upload the release wheel to PyPI after GitHub Release
+        type: boolean
+        default: false
+      pypi-environment:
+        description: >-
+          Optional GitHub Environment name for the PyPI job (Trusted Publishing /
+          protection rules). Empty = no environment.
+        type: string
+        default: ""
+    secrets:
+      PYPI_API_TOKEN:
+        description: Optional PyPI API token (fallback when not using Trusted Publishing)
+        required: false
     outputs:
       skip:
         description: Whether a release was skipped
@@ -49,12 +64,16 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  id-token: write
 
 jobs:
   semver:
     name: Semver
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: read
     outputs:
       skip: ${{ steps.final.outputs.skip }}
       tag: ${{ steps.final.outputs.tag }}
@@ -250,4 +269,53 @@ jobs:
             echo "skip=${{ steps.bump.outputs.skip }}" >> "$GITHUB_OUTPUT"
             echo "tag=${{ steps.bump.outputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "version=${{ steps.bump.outputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Opt-in: same wheel as the GitHub Release → PyPI.
+  # Prefer Trusted Publishing (OIDC). Fallback: secrets.PYPI_API_TOKEN.
+  pypi:
+    name: PyPI
+    needs: [semver]
+    if: >
+      inputs.publish-pypi &&
+      inputs.dry-run != true &&
+      needs.semver.outputs.skip != 'true' &&
+      needs.semver.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.pypi-environment != '' && inputs.pypi-environment || fromJSON('null') }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Download wheel from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.semver.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "${TAG}" --repo "${REPO}" --dir dist --pattern '*.whl'
+          wheel="$(ls -1 dist/*.whl | head -1)"
+          [[ -n "${wheel}" && -f "${wheel}" ]]
+          echo "Downloaded ${wheel}"
+
+      - name: Publish to PyPI
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          wheel="$(ls -1 dist/*.whl | head -1)"
+          [[ -n "${wheel}" && -f "${wheel}" ]]
+          if [[ -n "${PYPI_TOKEN}" ]]; then
+            echo "Publishing ${wheel} with API token"
+            uv publish "${wheel}" --token "${PYPI_TOKEN}"
+          else
+            echo "Publishing ${wheel} with Trusted Publishing (OIDC)"
+            uv publish "${wheel}" --trusted-publishing always
           fi

@@ -15,6 +15,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
 - **Floating `@v1`** — CD moves the major tag to each new release of that major
+- **Opt-in PyPI** — same release wheel via Trusted Publishing (OIDC) or API token
 - **Defaults that fit uv libraries** — Python 3.11–3.13, auto-detect `pyproject.toml`
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
