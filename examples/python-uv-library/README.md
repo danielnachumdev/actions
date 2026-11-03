@@ -1,10 +1,12 @@
 # Example: Python uv library
 
 1. Copy [`templates/workflows/ci.yml`](../../templates/workflows/ci.yml) and [`cd.yml`](../../templates/workflows/cd.yml)  
-2. Copy [`templates/github/`](../../templates/github/)  
-3. Labels: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
+2. Copy [`templates/github/`](../../templates/github/) (CODEOWNERS + **dependabot.yml**)  
+3. Create labels **before** Dependabot runs: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
 4. Required checks: **`CI / CI`**, **`Semver / Semver`**  
 5. Pin `@v1`
+
+Dependabot’s `labels:` (template: `dependencies` + `noBump` for **pip**, **npm**, and **github-actions**) only stick if those labels already exist. Without `noBump`, Semver CI fails on Dependabot PRs. Include the `npm` block only when the repo has a `package.json` (adjust `directory:` for monorepos, e.g. `/services/frontend`).
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
