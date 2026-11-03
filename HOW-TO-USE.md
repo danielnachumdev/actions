@@ -33,10 +33,12 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
 ### Optional PyPI (same wheel as the GitHub Release)
 
 1. On PyPI: add a **Trusted Publisher** for the GitHub repo + workflow filename `cd.yml`.  
-2. In thin `cd.yml`: `permissions.id-token: write`, `publish-pypi: true`, and pass secrets **by name** (see template).  
+2. In thin `cd.yml`: `permissions.id-token: write` (always — see note), `publish-pypi: true`, and pass secrets **by name** (see template).  
 3. Token fallback: set repo secret `PYPI_API_TOKEN` (optional if using OIDC only).
 
-**Note:** `secrets: inherit` only works for org/enterprise callers. User-owned repos (e.g. `danielnachumdev/*`) must map `PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}` explicitly — required whenever `semver-cd` declares `secrets:`, even with PyPI off / empty token.
+**Notes (user-owned repos):**
+- Map `PYPI_API_TOKEN` by name — `secrets: inherit` is org/enterprise-only.
+- Always set `id-token: write` on thin CD — GitHub requires it because `semver-cd` declares an OIDC PyPI job (validated even when skipped).
 
 Default remains **GitHub Release only** (`publish-pypi: false`).
 ## Verify

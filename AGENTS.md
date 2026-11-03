@@ -55,7 +55,7 @@ jobs:
 # CD — after successful CI on main
 permissions:
   contents: write
-  id-token: write  # when publish-pypi: true
+  id-token: write  # required by semver-cd even if publish-pypi is false
 jobs:
   semver:
     name: Semver
@@ -101,7 +101,11 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 | ------ | -------- | ------- |
 | `PYPI_API_TOKEN` | no | Token fallback; omit when using Trusted Publishing only |
 
-Callers **must** pass `secrets:` whenever they call `semver-cd` (it declares `PYPI_API_TOKEN`). On **user-owned** repos use an explicit map; `secrets: inherit` is org/enterprise-only and causes `startup_failure` here. An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
+Callers **must**:
+1. Pass `secrets: { PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }} }` — user repos cannot use `secrets: inherit` (org/enterprise only).
+2. Grant `permissions.id-token: write` — `semver-cd`’s PyPI job requests OIDC, and GitHub validates that even when `publish-pypi` is false / the job is skipped.
+
+An unset token is fine (`required: false`) for OIDC-only / PyPI-off.
 
 On a successful release, `semver-cd` force-moves floating `vMAJOR` (e.g. `v1`) to the release SHA so `@v1` stays current. When `publish-pypi: true`, a follow-up **PyPI** job downloads that release’s `.whl` and runs `uv publish` (OIDC `always`, or `--token` if `PYPI_API_TOKEN` is set). This repo’s dogfood `cd.yml` leaves PyPI **off**.
 

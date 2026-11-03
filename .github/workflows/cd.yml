@@ -22,6 +22,8 @@ permissions:
   contents: write
   pull-requests: read
   actions: read
+  # Required by semver-cd (pypi job declares id-token: write even when skipped).
+  id-token: write
 
 concurrency:
   group: cd-${{ github.event.workflow_run.head_sha || github.run_id }}
