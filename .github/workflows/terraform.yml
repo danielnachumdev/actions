@@ -1,5 +1,5 @@
 # Terraform fmt + init + plan; apply post-merge by default.
-#   uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
 #
 # Behavior (no consumer event_name expressions required):
 #   - Always: checkout → WIF auth → setup-terraform → fmt → init → plan

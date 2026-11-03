@@ -1,5 +1,5 @@
 # Semver at CI (PR) — require exactly one bump label.
-#   uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
 #
 # Allowed labels: noBump | bumpPatch | bumpMinor | bumpMajor
 

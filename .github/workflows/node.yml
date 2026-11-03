@@ -1,6 +1,6 @@
 # Node/TS lane. Prefer calling ci.yml unless you need this alone.
 #
-#   uses: danielnachumdev/actions/.github/workflows/node.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/node.yml@latest
 #
 # Install: npm ci | pnpm i --frozen-lockfile | yarn --frozen-lockfile | npm install
 # Runs package.json scripts when present: lint, then test (fail if neither exists).

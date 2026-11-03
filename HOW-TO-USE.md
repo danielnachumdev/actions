@@ -6,14 +6,15 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hy
 
 GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`.
 
-This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@v1` pins).
+This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@latest` pins).
 
-## Pins: `@v1` vs `@latest`
+## Pins: `@latest` vs immutable tags
 
 | Pin | Meaning |
 | --- | ------- |
-| **`@v1`** | Stable major contract. **Prefer this.** |
-| **`@latest`** | Newest successful release SHA when CD opts into `retags: '["latest"]'`. |
+| **`@latest`** | Newest successful release SHA. **Prefer this** — dogfood/template CD opts into `retags: '["latest"]'`. |
+| **Immutable** (`@v1.5.0`, …) | Freeze on a specific release tag. |
+| **`@v1`** | Floating major tag — **not** moved by default CD retags; only use if you maintain it yourself (e.g. standalone `retag.yml`). |
 
 ## Semver (optional — only if you publish versions)
 
@@ -32,25 +33,25 @@ This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` call
    - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`**) only apply if those labels **already exist**. With Semver, without `noBump`, Semver CI fails on Dependabot PRs — drop the `noBump` label entry from `dependabot.yml` when Semver is not used.  
 4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
 5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
-6. Pin `@v1`  
+6. Pin `@latest`  
 7. PyPI publishers only (Semver CD): **token** → `publish-pypi: true` + `PYPI_API_TOKEN`; **Trusted Publishing** → inline a `pypi` job in thin `cd.yml` (not via the reusable job)   
 8. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
-uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
 # Semver — only if this repo publishes versions:
-uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
-uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
+uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
 # optional standalone floating-tag mover:
-uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
 # optional Dependabot merge after CI (from thin CI — see below):
-uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@latest
 # optional raft VPS apply/redeploy (from thin CD — see below):
-uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@latest
 # optional Cloud Build / Cloud Run deploy (from thin CD — see below):
-uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@latest
 # optional Terraform plan / apply (PR plan; post-merge apply — see below):
-uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
 ```
 
 ### Terraform plan / apply (optional)
@@ -73,7 +74,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: danielnachumdev/actions/.github/workflows/terraform.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
     with:
       workload_identity_provider: projects/…/providers/github
       service_account: terraform-sa@PROJECT_ID.iam.gserviceaccount.com
@@ -100,7 +101,7 @@ Copy [`templates/workflows/raft-deploy.yml`](templates/workflows/raft-deploy.yml
 jobs:
   apply:
     name: Raft apply
-    uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@latest
     with:
       service: my-app
       git-repo: git@github.com:org/repo.git
@@ -154,7 +155,7 @@ SHA (recoveries, custom aliases, dry-run):
 jobs:
   retag:
     name: Retag
-    uses: danielnachumdev/actions/.github/workflows/retag.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
     with:
       sha: ${{ inputs.sha }}      # required commit SHA
       tags: '["latest"]'          # tags to force-move
@@ -174,7 +175,7 @@ Optional `*-push` / `skip-*-push` override only post-merge when set — do **not
 jobs:
   ci:
     name: CI
-    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
     with:
       python-versions: '["3.11","3.12","3.13"]'   # shared (both events)
       python-versions-push: '["3.11","3.13"]'      # optional lighter post-merge
@@ -192,12 +193,12 @@ once per job:
 jobs:
   unit:
     name: Unit
-    uses: danielnachumdev/actions/.github/workflows/python.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/python.yml@latest
     with:
       pytest-command: pytest tests/unit -q
   integration:
     name: Integration
-    uses: danielnachumdev/actions/.github/workflows/python.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/python.yml@latest
     with:
       pytest-command: pytest tests/integration -q -m integration
 ```
@@ -208,7 +209,7 @@ Via `ci.yml` (single lane):
 jobs:
   ci:
     name: CI
-    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
     with:
       pytest-command: pytest tests/unit
 ```
@@ -242,7 +243,7 @@ Override via `workflow_call` inputs when a lane needs more (or less) time:
 jobs:
   ci:
     name: CI
-    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
     with:
       python-timeout-minutes: 45
 ```
@@ -261,7 +262,7 @@ deploy-cloudrun:
   permissions:
     contents: read
     id-token: write
-  uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@v1
+  uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@latest
   with:
     workload_identity_provider: projects/…/providers/github
     service_account: deploy-sa@PROJECT_ID.iam.gserviceaccount.com
@@ -329,7 +330,7 @@ dependabot-auto-merge:
   permissions:
     contents: write
     pull-requests: write
-  uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+  uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@latest
 ```
 
 Thin CI **without Semver**: `needs: [ci]` (or `[test]` / whatever your single required PR job id is) and the same `if:` / permissions / `uses:`.
@@ -350,7 +351,7 @@ dependabot-auto-merge:
   permissions:
     contents: write
     pull-requests: write
-  uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+  uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@latest
 ```
 
 (Replace `ci` with your aggregate job id.) This belongs on the **caller**; the reusable workflow cannot undo skip-propagation by itself.
@@ -381,7 +382,7 @@ Two supported paths — pick **one**:
 ```yaml
 jobs:
   semver:
-    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
     with:
       publish-pypi: false
       # …sha, standards-ref, etc.

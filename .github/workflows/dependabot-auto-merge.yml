@@ -32,7 +32,7 @@
 #     permissions:
 #       contents: write
 #       pull-requests: write
-#     uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@v1
+#     uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@latest
 
 name: dependabot-auto-merge
 
