@@ -18,7 +18,7 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
 - **Opt-in floating tags** — pass `retags: '["latest"]'` on CD; prefer **`@v1`** pins
-- **Opt-in PyPI** — same release wheel via API token (OIDC later from thin CD)
+- **Opt-in PyPI** — same release wheel via Trusted Publishing (OIDC) or `PYPI_API_TOKEN`
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
 ## Sixty-second start
