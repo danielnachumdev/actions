@@ -37,9 +37,10 @@ jobs:
       standards-ref: ${{ github.sha }}
       # timeout-minutes: 5
 
-  # Opt-in Dependabot auto-merge (dogfood). Repo Allow auto-merge must be on.
+  # Opt-in: merge Dependabot PRs after sibling CI jobs pass (dogfood).
   dependabot-auto-merge:
-    name: Dependabot auto-merge
+    name: Merge Dependabot PR
+    needs: [ci, semver]
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
     permissions:
       contents: write
