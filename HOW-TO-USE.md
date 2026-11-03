@@ -97,7 +97,7 @@ jobs:
 
 ### Override the pytest command
 
-Default Python lane runs `uv run pytest .` in `working-directory` on **both** PR
+Default Python lane runs `uv run pytest . -q` in `working-directory` on **both** PR
 and push. Pass `pytest-command` for the full invocation (suite path, markers, flags)
 — there is no separate `pytest-args` input. For several suites, call `python.yml`
 once per job:

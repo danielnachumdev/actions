@@ -71,7 +71,7 @@ class TestCiWorkflow:
             assert not key.endswith("-pr"), key
             assert not key.startswith("skip-") or key.endswith("-push"), key
         assert inputs["python-versions-push"]["default"] == ""
-        assert inputs["pytest-command"]["default"] == "pytest ."
+        assert inputs["pytest-command"]["default"] == "pytest . -q"
         assert "pytest-command-push" not in inputs
         assert inputs["skip-python-push"]["default"] is False
         jobs = data["jobs"]
@@ -117,7 +117,7 @@ class TestPythonWorkflow:
     def test_pytest_command_defaults_and_wired(self):
         data = _load("python.yml")
         inputs = _on(data)["workflow_call"]["inputs"]
-        assert inputs["pytest-command"]["default"] == "pytest ."
+        assert inputs["pytest-command"]["default"] == "pytest . -q"
         assert "pytest-args" not in inputs
         steps = data["jobs"]["test"]["steps"]
         pytest_step = next(
