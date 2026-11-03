@@ -22,9 +22,9 @@ on:
       pytest-command:
         description: >-
           Full pytest invocation under `uv run` in working-directory
-          (include flags here, e.g. `pytest . -q`). Default `pytest . -q`.
+          (include flags here, e.g. `pytest -q`). Default `pytest -q`.
         type: string
-        default: "pytest . -q"
+        default: "pytest -q"
       timeout-minutes:
         description: Job timeout for each matrix cell (minutes)
         type: number

@@ -66,9 +66,9 @@ on:
       pytest-command:
         description: >-
           Full pytest invocation under `uv run` in working-directory (same for PR
-          and push; include flags in the command). Default `pytest . -q`.
+          and push; include flags in the command). Default `pytest -q`.
         type: string
-        default: "pytest . -q"
+        default: "pytest -q"
       disable-python:
         description: If true, never run the Python lane (any event)
         type: boolean
@@ -141,7 +141,7 @@ jobs:
           NODE_VERSIONS_PUSH: ${{ inputs.node-versions-push }}
           SYNC_ARGS: ${{ inputs.sync-args || '--group dev' }}
           SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
-          PYTEST_COMMAND: ${{ inputs.pytest-command || 'pytest . -q' }}
+          PYTEST_COMMAND: ${{ inputs.pytest-command || 'pytest -q' }}
           SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
           SKIP_NODE_PUSH: ${{ inputs.skip-node-push == true && 'true' || 'false' }}
         run: |

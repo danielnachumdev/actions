@@ -93,7 +93,7 @@ Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`
 | `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON (both events) |
 | `node-versions` | `["20","22"]` | Matrix JSON (both events) |
 | `sync-args` | `--group dev` | `uv sync` |
-| `pytest-command` | `pytest . -q` | Full invocation under `uv run` (cwd = working-directory; same PR + push) |
+| `pytest-command` | `pytest -q` | Full invocation under `uv run` (cwd = working-directory; same PR + push) |
 | `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
 | `detect-timeout-minutes` | `5` | Detect job timeout |
 | `python-timeout-minutes` | `30` | Passed to `python.yml` per matrix cell |
