@@ -5,7 +5,7 @@ Apply this to [danielnachumdev](https://github.com/danielnachumdev) libraries. P
 ## Folders vs flat workflows
 
 GitHub docs: reusable workflows live in `.github/workflows/` and **subdirectories are not supported**.  
-Organize with **short flat names** (`ci.yml`, `label.yml`, `release.yml`).  
+Organize with **short flat names** (`ci.yml`, `label.yml`, `semver.yml`).  
 Composite actions **may** use `.github/actions/<name>/`.
 
 ## Goals
@@ -42,7 +42,7 @@ Composite actions **may** use `.github/actions/<name>/`.
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/label.yml@v1
-uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
 ```
 
 ## Labels / settings / ruleset
@@ -52,7 +52,7 @@ See earlier playbook commands in git history or run from README examples — sam
 ## Semver
 
 [`scripts/release/release_semver.py`](scripts/release/release_semver.py) + default wheel build [`build_python_uv_wheel.sh`](scripts/release/build_python_uv_wheel.sh).  
-Custom artifact: pass `build-command` into `release.yml` (`TAG` in env).
+Custom artifact: pass `build-command` into `semver.yml` (`TAG` in env).
 
 ## Verify
 

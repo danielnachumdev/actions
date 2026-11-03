@@ -14,7 +14,7 @@
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
 uses: danielnachumdev/actions/.github/workflows/label.yml@v1
-uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
 ```
 
 ## Reference

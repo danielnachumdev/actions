@@ -9,7 +9,7 @@ Stop copying the same pytest matrix and release YAML into every library. **Pin `
 
 ## Why this repo?
 
-- **Short, declarative workflow names** — `ci.yml`, `label.yml`, `release.yml` (as short as reusable workflows allow)
+- **Short, declarative workflow names** — `ci.yml`, `label.yml`, `semver.yml` (as short as reusable workflows allow)
 - **Defaults that fit uv libraries** — Python 3.11–3.13, `uv sync --group dev`, pytest — override only when you need to
 - **Auto-detect** — finds `pyproject.toml` and runs the right lane
 - **Label-driven semver** — `bumpMajor` / `bumpMinor` / `bumpPatch` / `noBump` → GitHub Release + wheel
@@ -31,9 +31,9 @@ jobs:
   label:
     name: Label
     uses: danielnachumdev/actions/.github/workflows/label.yml@v1
-  release:
-    name: Release
-    uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+  semver:
+    name: Semver
+    uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
     with:
       sha: ${{ github.sha }}
 ```

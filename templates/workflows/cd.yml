@@ -1,8 +1,8 @@
 name: CD
 
 # Thin orchestrator for label gate + semver Release.
-#   label:   .../label.yml@v1
-#   release: .../release.yml@v1
+#   label:  .../label.yml@v1   — PR must have exactly one bump/noBump label
+#   semver: .../semver.yml@v1 — after CI on main: bump → wheel → GitHub Release
 # Labels (exactly one): bumpMajor | bumpMinor | bumpPatch | noBump
 # Prefer requiring check "Label / Label".
 
@@ -41,15 +41,15 @@ jobs:
     with:
       standards-ref: v1
 
-  release:
-    name: Release
+  semver:
+    name: Semver
     if: >
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main') ||
       github.event_name == 'workflow_dispatch'
-    uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
     with:
       standards-ref: v1
       dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}

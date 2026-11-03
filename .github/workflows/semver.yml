@@ -1,9 +1,9 @@
 # Semver GitHub Release — short pin:
-#   uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+#   uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
 #
 # Call from a thin product CD workflow after successful CI (workflow_run) or dispatch.
 
-name: release
+name: semver
 
 on:
   workflow_call:

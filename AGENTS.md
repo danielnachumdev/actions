@@ -19,7 +19,7 @@ Product pitch: [`README.md`](README.md). Rollout checklist: [`PLAYBOOK.md`](PLAY
 .github/workflows/ci.yml       # public CI entry (+ dogfood on push/PR)
 .github/workflows/python.yml   # uv pytest matrix lane
 .github/workflows/label.yml    # release-label gate
-.github/workflows/release.yml  # semver GitHub Release + wheel
+.github/workflows/semver.yml  # bump → wheel → GitHub Release
 .github/actions/detect-layout/ # optional composite (see pitfall below)
 scripts/release/               # release_semver.py, build_python_uv_wheel.sh
 templates/                     # copy-paste consumer starters
@@ -38,7 +38,7 @@ Reusable workflows **cannot** use `uses: danielnachumdev/actions@v1` — that fo
 danielnachumdev/actions/.github/workflows/<file>.yml@v1
 ```
 
-Keep `<file>` short: `ci`, `label`, `release`, `python`.
+Keep `<file>` short: `ci`, `python`, `label`, `semver`.
 
 ### CI entry
 
@@ -84,10 +84,10 @@ jobs:
     with:
       standards-ref: v1
 
-  release:
-    name: Release
+  semver:
+    name: Semver
     # if: successful CI on main / dispatch …
-    uses: danielnachumdev/actions/.github/workflows/release.yml@v1
+    uses: danielnachumdev/actions/.github/workflows/semver.yml@v1
     with:
       standards-ref: v1
       sha: ${{ github.event.workflow_run.head_sha }}  # or github.sha
@@ -107,9 +107,9 @@ Starters: [`templates/workflows/`](templates/workflows/) · [`templates/github/`
 | Path | Role |
 | ---- | ---- |
 | `scripts/release/release_semver.py` | Labels → next `vX.Y.Z` or skip (`noBump`) |
-| `scripts/release/build_python_uv_wheel.sh` | Stamp version + `uv build --wheel` (default for `release.yml`) |
+| `scripts/release/build_python_uv_wheel.sh` | Stamp version + `uv build --wheel` (default for `semver.yml`) |
 
-Custom artifact: pass `build-command` into `release.yml` (`TAG` is in the environment; command must print `wheel=<path>`).
+Custom artifact: pass `build-command` into `semver.yml` (`TAG` is in the environment; command must print `wheel=<path>`).
 
 ---
 
