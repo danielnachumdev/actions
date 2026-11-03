@@ -79,9 +79,9 @@ Caller needs `permissions: contents: write`. Inputs: `sha`, `tags`, `dry-run`.
 
 ### Shared CI + optional post-merge overrides (no consumer expressions)
 
-Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-args`, …)
-run on **both** `pull_request` and `push` / `workflow_dispatch`. Optional `*-push` /
-`skip-*-push` override only post-merge when set — do **not** write
+Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-command`,
+`pytest-args`, …) run on **both** `pull_request` and `push` / `workflow_dispatch`.
+Optional `*-push` / `skip-*-push` override only post-merge when set — do **not** write
 `python-versions: ${{ github.event_name == 'push' && '…' || '…' }}` in the thin orchestrator.
 
 ```yaml
@@ -93,6 +93,39 @@ jobs:
       python-versions: '["3.11","3.12","3.13"]'   # shared (both events)
       python-versions-push: '["3.11","3.13"]'      # optional lighter post-merge
       skip-node-push: true                           # optional: skip Node on push only
+```
+
+### Override the pytest command
+
+Default Python lane runs `uv run pytest . -q` in `working-directory`. Pass
+`pytest-command` to change the invocation (suite path, markers, etc.); `pytest-args`
+are still appended. For several suites, call `python.yml` once per job:
+
+```yaml
+jobs:
+  unit:
+    name: Unit
+    uses: danielnachumdev/actions/.github/workflows/python.yml@v1
+    with:
+      pytest-command: pytest tests/unit
+  integration:
+    name: Integration
+    uses: danielnachumdev/actions/.github/workflows/python.yml@v1
+    with:
+      pytest-command: pytest tests/integration
+      pytest-args: "-q -m integration"
+```
+
+Via `ci.yml` (single lane):
+
+```yaml
+jobs:
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    with:
+      pytest-command: pytest tests/unit
+      # pytest-command-push: pytest tests/unit   # optional post-merge override
 ```
 
 **Empty-string semantics:** omitting a `*-push` input and passing `""` are the same —
