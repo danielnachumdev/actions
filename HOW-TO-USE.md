@@ -4,9 +4,26 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hy
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@latest` pins).
+
+## Auto-detect (umbrella `ci.yml`)
+
+Thin consumers usually need **no `with:`**. Detect scopes markers to `working-directory` (default `.`). Repo-root `.github/` always drives the YAML parse lane.
+
+| Marker | Lane | Credentials? |
+| ------ | ---- | ------------ |
+| `pyproject.toml` | `python.yml` | no |
+| `package.json` | `node.yml` | no |
+| `.github/` (repo root) | `github-yaml.yml` | no |
+| `{alembic-root}/versions/` (default `alembic`) | `rebase-guard.yml` | no |
+| `versions.tf` under `terraform/` (or `extra-terraform-module-paths`) | `terraform-validate.yml` always; `terraform.yml` plan/apply only if `workload_identity_provider` + `service_account` are non-empty | validate: no; apply: WIF |
+| `.raft/` + app manifest | `raft-deploy.yml` when `raft-service`, `raft-git-repo`, and `secrets.VPS_SSH_KEY` are set | yes |
+
+**Not auto-wired:** `cloudrun-deploy.yml`, `semver-*`, `dependabot-auto-merge.yml` — call them from the thin orchestrator when you want them.
+
+Inferred when inputs are left empty: `sync-args` from pyproject dependency groups; `node-versions` from `.nvmrc` / `engines.node` (else `["20","22"]`). Explicit values always win. Use `disable-*` / `allow-empty` / `*-push` to override.
 
 ## Pins: `@latest` vs immutable tags
 
@@ -54,48 +71,50 @@ uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@latest
 uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
 ```
 
-### Terraform plan / apply (optional)
+### Terraform (auto + optional direct)
 
-Reusable job: WIF auth → `setup-terraform` → `fmt` → `init` → `plan`, then **`apply` post-merge** by default. Path filters and app deploys stay in the **caller**.
+Umbrella **`ci.yml`** already runs **`terraform-validate`** (fmt + `init -backend=false` + validate, no cloud creds) when `versions.tf` is found. Pass WIF on the umbrella to also run plan/apply:
 
-| Event | Default |
+```yaml
+jobs:
+  ci:
+    name: CI
+    permissions:
+      contents: read
+      id-token: write
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
+    with:
+      workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+      service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+      # skip-apply-push: true   # plan-only on push
+```
+
+Or call plan/apply alone via [`templates/workflows/terraform.yml`](templates/workflows/terraform.yml) / `terraform.yml@latest`. Validate alone: `terraform-validate.yml@latest`.
+
+| Event (apply lane) | Default |
 | ----- | ------- |
-| `pull_request` | plan only (`fmt` + `init` + `plan`) |
+| `pull_request` | plan only |
 | `push` | plan, then apply (unless `skip-apply-push: true`) |
 | `workflow_dispatch` | plan, then apply |
 | any + `apply: true` | force apply (including on PR) |
 
-Copy [`templates/workflows/terraform.yml`](templates/workflows/terraform.yml) or call from a thin deploy / CI workflow:
-
-```yaml
-jobs:
-  terraform:
-    name: Terraform
-    permissions:
-      contents: read
-      id-token: write
-    uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
-    with:
-      workload_identity_provider: projects/…/providers/github
-      service_account: terraform-sa@PROJECT_ID.iam.gserviceaccount.com
-      # working-directory: terraform
-      # terraform-version: "1.9.8"
-      # skip-apply-push: ${{ vars.ENABLE_GHA_CD != 'true' }}  # optional CD gate
-      # init-args: ""
-      # plan-args: ""
-      # skip-fmt: false
-      # timeout-minutes: 30
-```
-
-Caller needs `permissions.id-token: write` (and `contents: read`). Same WIF caveat as Cloud Run: pool trust on the **calling** repo (`attribute.repository`), not `job_workflow_ref` to this reusable file.
-
-When apply runs, plan writes `-out=tfplan` and apply uses that file. `TF_IN_AUTOMATION=true` is set. Do **not** put `github.event_name` apply gates in the thin orchestrator — use `skip-apply-push` / `apply` instead.
+Caller needs `permissions.id-token: write` for apply. WIF pool trust on the **calling** repo (`attribute.repository`), not `job_workflow_ref` to this reusable file.
 
 ### Raft VPS apply / redeploy (optional)
 
-Reusable SSH + `raft apply` for App hosts (nachum-mealie CD apply-raft shape). **Not** Semver, Cloud Run, or GHCR — only the VPS apply script.
+Umbrella unlocks raft when **`.raft/`** exists and you pass `raft-service`, `raft-git-repo`, plus `secrets.VPS_SSH_KEY`. Or call [`raft-deploy.yml`](templates/workflows/raft-deploy.yml) directly from CD:
 
-Copy [`templates/workflows/raft-deploy.yml`](templates/workflows/raft-deploy.yml) or call the reusable workflow from your own CD:
+```yaml
+jobs:
+  ci:
+    name: CI
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
+    with:
+      raft-service: my-app
+      raft-git-repo: git@github.com:org/repo.git
+    secrets:
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+```
 
 ```yaml
 jobs:
@@ -108,9 +127,6 @@ jobs:
       ref: ${{ github.sha }}
       # host: 192.0.2.10          # optional; empty → vars.VPS_HOST
       # ssh-user: raft            # optional; empty → vars.VPS_USER → raft
-      # command_timeout: 10m
-      # skip-doctor: false
-      # timeout-minutes: 15
     secrets:
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 ```
@@ -168,8 +184,8 @@ Caller needs `permissions: contents: write`. Inputs: `sha`, `tags`, `dry-run`.
 
 Shared inputs (`python-versions`, `node-versions`, `sync-args`, `pytest-command`, …)
 run on **both** `pull_request` and `push` / `workflow_dispatch`.
-Optional `*-push` / `skip-*-push` override only post-merge when set — do **not** write
-`python-versions: ${{ github.event_name == 'push' && '…' || '…' }}` in the thin orchestrator.
+Empty `sync-args` / `node-versions` → Detect infers. Optional `*-push` / `skip-*-push`
+override only post-merge — do **not** write `event_name` expressions in the thin orchestrator.
 
 ```yaml
 jobs:
@@ -229,8 +245,10 @@ Override via `workflow_call` inputs when a lane needs more (or less) time:
 
 | Workflow | Inputs (defaults) |
 | -------- | ----------------- |
-| `ci.yml` | `detect-timeout-minutes` (5), `python-timeout-minutes` (30), `node-timeout-minutes` (30), `ci-timeout-minutes` (5) |
+| `ci.yml` | `detect` (5), `python`/`node` (30), `github-yaml`/`rebase-guard` (10), `terraform-validate` (15), `terraform` (30), `raft` (15), `ci` (5) |
 | `python.yml` / `node.yml` | `timeout-minutes` (30) |
+| `github-yaml.yml` / `rebase-guard.yml` | `timeout-minutes` (10) |
+| `terraform-validate.yml` | `timeout-minutes` (15) |
 | `semver-ci.yml` | `timeout-minutes` (5) |
 | `semver-cd.yml` | `timeout-minutes` (30), `pypi-timeout-minutes` (15), `retag-timeout-minutes` (10) |
 | `retag.yml` | `timeout-minutes` (10) |

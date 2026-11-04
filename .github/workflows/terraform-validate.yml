@@ -1,0 +1,88 @@
+# Terraform fmt + init -backend=false + validate (no cloud credentials).
+#
+#   uses: danielnachumdev/actions/.github/workflows/terraform-validate.yml@latest
+
+name: terraform-validate
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory for fmt -recursive and versions.tf discovery
+        type: string
+        required: false
+        default: terraform
+      extra-module-paths:
+        description: Comma-separated extra module directories to validate
+        type: string
+        required: false
+        default: ""
+      terraform-version:
+        description: Terraform CLI version for hashicorp/setup-terraform
+        type: string
+        required: false
+        default: "1.9.8"
+      skip-fmt:
+        description: Skip terraform fmt -check -recursive
+        type: boolean
+        required: false
+        default: false
+      timeout-minutes:
+        description: Job timeout (minutes)
+        type: number
+        required: false
+        default: 15
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Terraform validate
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        if: ${{ !inputs.skip-fmt }}
+        run: terraform fmt -check -recursive "${{ inputs.working-directory }}"
+
+      - name: Validate modules
+        env:
+          TF_ROOT: ${{ inputs.working-directory }}
+          EXTRA_PATHS: ${{ inputs.extra-module-paths }}
+        run: |
+          set -euo pipefail
+          declare -a mods=()
+          if [[ -d "${TF_ROOT}" ]]; then
+            while IFS= read -r -d '' v; do
+              mods+=("$(dirname "$v")")
+            done < <(find "$TF_ROOT" -type f -name versions.tf -print0 | sort -z)
+          fi
+          while IFS= read -r line; do
+            p="${line#"${line%%[![:space:]]*}"}"
+            p="${p%"${p##*[![:space:]]}"}"
+            [[ -z "$p" ]] && continue
+            mods+=("$p")
+          done < <(echo "$EXTRA_PATHS" | tr ',' '\n')
+          mapfile -t uniq < <(printf '%s\n' "${mods[@]}" | sort -u)
+          if [[ ${#uniq[@]} -eq 0 || -z "${uniq[0]:-}" ]]; then
+            echo "::error::No Terraform module roots found under $TF_ROOT (add versions.tf roots or extra-module-paths)"
+            exit 1
+          fi
+          for dir in "${uniq[@]}"; do
+            if [[ ! -d "$dir" ]]; then
+              echo "::error::Module path is not a directory: $dir"
+              exit 1
+            fi
+            echo "::group::terraform validate — $dir"
+            (cd "$dir" && terraform init -backend=false -input=false && terraform validate)
+            echo "::endgroup::"
+          done

@@ -1,12 +1,12 @@
 name: CI
 
 # Thin orchestrator. Prefer requiring check "CI / CI".
+# Umbrella auto-detects lanes from layout (pyproject, package.json, .github/,
+# alembic, terraform/, .raft/). Override or disable-* only when needed.
 # Add Semver (job below + "Semver / Semver" required check) ONLY if this repo
 # publishes versions (releases/tags/wheels). Apps/sites/infra: omit semver.
-# Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
 #
 # Prefer @latest (CD moves floating latest after each release).
-# Pin an immutable @vN.N.N when you need a freeze.
 
 on:
   push:
@@ -23,29 +23,35 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  id-token: write # Terraform plan/apply when WIF inputs are passed
 
 jobs:
   ci:
     name: CI
     uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
-    # with:  # all optional — defaults + auto-detect pyproject.toml / package.json
+    # secrets:
+    #   VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}   # unlocks raft when .raft/ + raft-service/git-repo set
+    # with:
     #   working-directory: .
-    #   python-versions: '["3.11","3.12","3.13"]'          # shared (both events)
-    #   python-versions-push: '["3.11","3.13"]'             # optional lighter post-merge
-    #   node-versions: '["20","22"]'
-    #   sync-args: "--group dev"
-    #   pytest-command: "pytest -q"                         # full cmd under uv run (flags included)
-    #   disable-python: false                                 # never run lane (any event)
-    #   disable-node: false
-    #   skip-node-push: true                                  # skip Node on push only
-    #   # *-push omitted or "" → inherit shared (not a clear). Skip lanes via skip-*-push.
-    #   # python-versions-push / node-versions-push / sync-args-push
-    #   # skip-python-push / skip-node-push
-    #   # Timeouts (minutes; defaults preserve prior hardcodes):
-    #   # detect-timeout-minutes: 5
-    #   # python-timeout-minutes: 30
-    #   # node-timeout-minutes: 30
-    #   # ci-timeout-minutes: 5
+    #   # Unlock terraform plan/apply (validate still runs from versions.tf alone):
+    #   workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+    #   service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+    #   # Unlock raft (also needs .raft/ + secrets.VPS_SSH_KEY):
+    #   # raft-service: my-app
+    #   # raft-git-repo: git@github.com:org/repo.git
+    #   # disable-python: false
+    #   # disable-node: false
+    #   # disable-github-yaml: false
+    #   # disable-rebase-guard: false
+    #   # disable-terraform: false
+    #   # disable-terraform-apply: false
+    #   # disable-raft: false
+    #   # python-versions: '["3.11","3.12","3.13"]'
+    #   # python-versions-push: '["3.11","3.13"]'
+    #   # node-versions: '["22"]'   # empty → infer .nvmrc / engines
+    #   # sync-args: "--group dev"  # empty → infer from pyproject groups
+    #   # pytest-command: "pytest -q"
+    #   # allow-empty: false
 
   semver:
     name: Semver

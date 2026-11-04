@@ -14,8 +14,9 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 | Python | `>=3.11` (CI matrix **3.11, 3.12, 3.13** via reusable `ci.yml` defaults) |
 | Tests | `tests/` — pytest; **never delete** |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml`, `python.yml`, `node.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml` (`workflow_call` only; optional PyPI job on CD) |
-| Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…` |
+| Building blocks | `ci.yml` (umbrella Detect), `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml` |
+| Detect | `scripts/ci/detect_layout.sh` (+ bundled copy under `.github/actions/detect-layout/`); umbrella checks out standards at `standards-ref` |
+| Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…`; dogfood passes `standards-ref: ${{ github.sha }}` |
 | Pinning (consumers) | Prefer **`@latest`** (CD opts into `retags: '["latest"]'`); immutable `@vN.N.N` to freeze |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 | Secrets | Never commit API tokens, `.pypirc`, or credential files. Thin CD may map `PYPI_API_TOKEN` by name (needed for `publish-pypi: true`; empty OK when PyPI-off / OIDC is caller-inlined). |
@@ -25,20 +26,24 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 ├── .github/
 │   ├── CODEOWNERS
 │   ├── dependabot.yml
-│   ├── actions/detect-layout/   # composite used by reusable ci.yml detect
+│   ├── actions/detect-layout/   # composite + bundled detect_layout.sh
 │   └── workflows/
-│       ├── ci.yml               # reusable CI entry (workflow_call only)
+│       ├── ci.yml               # umbrella Detect → lanes → aggregate CI
 │       ├── python.yml           # uv pytest matrix lane
 │       ├── node.yml             # Node/TS lint+test matrix lane
+│       ├── github-yaml.yml      # parse .github/**/*.yml
+│       ├── rebase-guard.yml     # Alembic revision rebase check
+│       ├── terraform-validate.yml  # fmt + init -backend=false + validate
+│       ├── terraform.yml        # WIF → fmt/init/plan; apply post-merge by default
 │       ├── semver-ci.yml        # CI stage: validate bump label on PR
 │       ├── semver-cd.yml        # CD: bump → wheel → Release → optional retag → optional PyPI
 │       ├── retag.yml            # force-move explicit floating tags
 │       ├── dependabot-auto-merge.yml
 │       ├── cloudrun-deploy.yml  # WIF → gcloud builds triggers run + stream logs
 │       ├── raft-deploy.yml      # SSH + raft apply / doctor on a VPS
-│       ├── terraform.yml        # WIF → fmt/init/plan; apply post-merge by default
 │       ├── check.yml            # dogfood thin CI (name: CI)
 │       └── cd.yml               # dogfood thin CD
+├── scripts/ci/detect_layout.sh  # Detect source of truth (keep action copy in sync)
 ├── scripts/release/             # release_semver.py, build_python_uv_wheel.sh
 ├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun/raft/terraform + CODEOWNERS / Dependabot (@latest)
 ├── examples/
@@ -74,11 +79,11 @@ Config for pytest lives in `pyproject.toml`. Prefer editing floors / deps there 
 
 ### Changing CI / workflows
 
-1. Edit reusable blocks under `.github/workflows/` (`ci.yml`, `python.yml`, `node.yml`, `semver-*.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`, `terraform.yml`).
-2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@latest` in templates). Cloud Run, raft, and Terraform are optional (template only; not dogfooded here).
+1. Edit reusable blocks under `.github/workflows/` and Detect under `scripts/ci/detect_layout.sh` (copy into `.github/actions/detect-layout/detect_layout.sh`).
+2. Keep dogfood thin `check.yml` / `cd.yml` aligned with [`templates/workflows/`](templates/workflows/) (relative `./` here; `@latest` in templates). Cloud Run stays direct-call only.
 3. Update [`HOW-TO-USE.md`](HOW-TO-USE.md) + templates when inputs, required check names, or adoption steps change.
 4. Breaking inputs / check names → new **major** tag; update templates + consumers together.
-5. Composite helpers under `.github/actions/` are for **this** repo’s reusable workflows; from `workflow_call`, relative `uses: ./.github/actions/...` resolves to the **caller** — prefer full `danielnachumdev/actions/...@latest` or inline (as `ci.yml` detect does).
+5. Umbrella Detect checks out this repo at `standards-ref` into `.actions-standards` then `uses: ./.actions-standards/.github/actions/detect-layout` (relative `./.github/actions` from `workflow_call` would resolve to the **caller**).
 
 ---
 
@@ -128,34 +133,22 @@ Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label ed
 
 ### `ci.yml` inputs (optional)
 
-Shared defaults (run on **both** `pull_request` and `push` / `workflow_dispatch`):
+Detect auto-selects lanes from layout under `working-directory`. Credentials unlock deploy-ish lanes (Terraform apply, raft). See HOW-TO-USE detection table.
 
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
-| `working-directory` | `.` | App root |
-| `pyproject-path` | `pyproject.toml` | Presence → Python lane |
-| `package-json-path` | `package.json` | Presence → Node lane |
+| `working-directory` | `.` | Scoped marker root |
+| `standards-ref` | `latest` | Ref of this hub for detect-layout checkout |
 | `python-versions` | `["3.11","3.12","3.13"]` | Matrix JSON (both events) |
-| `node-versions` | `["20","22"]` | Matrix JSON (both events) |
-| `sync-args` | `--group dev` | `uv sync` |
-| `pytest-command` | `pytest -q` | Full invocation under `uv run` (cwd = working-directory; same PR + push) |
-| `disable-python` / `disable-node` / `allow-empty` | `false` | Global lane kill / empty OK |
-| `detect-timeout-minutes` | `5` | Detect job timeout |
-| `python-timeout-minutes` | `30` | Passed to `python.yml` per matrix cell |
-| `node-timeout-minutes` | `30` | Passed to `node.yml` per matrix cell |
-| `ci-timeout-minutes` | `5` | CI gate job timeout |
+| `node-versions` | `""` | Empty → infer `.nvmrc` / engines / `["20","22"]` |
+| `sync-args` | `""` | Empty → infer from pyproject dependency groups |
+| `pytest-command` | `pytest -q` | Full invocation under `uv run` |
+| `workload_identity_provider` / `service_account` | `""` | Non-empty → terraform plan/apply when TF layout present |
+| `raft-service` / `raft-git-repo` | `""` | With `secrets.VPS_SSH_KEY` + `.raft/` → raft lane |
+| `disable-*` / `allow-empty` | `false` | Force-skip lanes / empty OK |
+| lane `*-timeout-minutes` | (see HOW-TO-USE) | Per-lane timeouts |
 
-Optional post-merge overrides (`push` / `workflow_dispatch` only). Omitted or `""` / `false` → shared default (empty does **not** clear a matrix; use `skip-*-push` to skip a lane). Do not pass `'[]'` as “run nothing”. Defaults preserve full matrices on both events.
-
-| Input | Default | Meaning |
-| ----- | ------- | ------- |
-| `python-versions-push` | `""` | Override Python matrix post-merge |
-| `node-versions-push` | `""` | Override Node matrix post-merge |
-| `sync-args-push` | `""` | Override `uv sync` args post-merge |
-| `skip-python-push` | `false` | Skip Python post-merge only |
-| `skip-node-push` | `false` | Skip Node post-merge only |
-
-Consumers must **not** inject `github.event_name` expressions for matrices — use these inputs.
+Optional post-merge: `python-versions-push`, `node-versions-push`, `sync-args-push`, `skip-python-push`, `skip-node-push`. Omitted/`""` inherits shared (does **not** clear). Consumers must **not** inject `github.event_name` for matrices.
 
 ### `semver-cd.yml` inputs
 

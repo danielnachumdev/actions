@@ -1,0 +1,65 @@
+# Parse-check every *.yml under .github/. Prefer calling ci.yml unless alone.
+#
+#   uses: danielnachumdev/actions/.github/workflows/github-yaml.yml@latest
+
+name: github-yaml
+
+on:
+  workflow_call:
+    inputs:
+      timeout-minutes:
+        description: Job timeout (minutes)
+        type: number
+        default: 10
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    name: Parse .github YAML
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install PyYAML
+        run: python3 -m pip install --disable-pip-version-check -q pyyaml
+
+      - name: Parse .github/**/*.yml
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          root = Path(".github")
+          if not root.is_dir():
+              print("OK: no .github directory")
+              sys.exit(0)
+          paths = sorted(
+              p
+              for p in root.rglob("*")
+              if p.is_file() and p.suffix.lower() == ".yml"
+          )
+          if not paths:
+              print("OK: no .yml files under .github/")
+              sys.exit(0)
+          errors: list[tuple[Path, BaseException]] = []
+          for path in paths:
+              try:
+                  text = path.read_text(encoding="utf-8")
+                  list(yaml.safe_load_all(text))
+              except Exception as exc:
+                  errors.append((path, exc))
+          if errors:
+              for path, exc in errors:
+                  rel = path.as_posix()
+                  msg = str(exc).replace("%", "%25").replace("\n", "%0A").replace("\r", "%0D")
+                  print(f"::error file={rel}::{msg}")
+              print(f"::error::Invalid YAML in {len(errors)} file(s)", file=sys.stderr)
+              sys.exit(1)
+          print(f"OK: parsed {len(paths)} YAML file(s) under .github/")
+          PY

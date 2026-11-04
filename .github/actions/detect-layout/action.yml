@@ -1,33 +1,160 @@
-# Optional composite (folders ARE allowed under .github/actions/).
-# Prefer the inlined detect step inside ci.yml when calling via workflow_call:
-# relative `uses: ./.github/actions/...` resolves to the *caller* repo, not this one.
-# Call explicitly if needed:
+# Composite wrapper around scripts/ci/detect_layout.sh.
+# Prefer invoking via the umbrella ci.yml (checks out this repo at standards-ref).
+# Direct use:
 #   uses: danielnachumdev/actions/.github/actions/detect-layout@latest
+#
+# Note: relative uses: ./.github/actions/... from a workflow_call resolves to the
+# *caller* repo — always pin the hub path (or check out standards first).
+
 name: Detect layout
 description: >-
-  Inspect working-directory for pyproject; emit run_python and working_directory.
+  Inspect working-directory (and repo-root .github/) for portable CI markers;
+  emit run_* flags and inferred knobs (sync-args, node-versions).
 
 inputs:
   working-directory:
-    description: Repo-relative app root
+    description: Repo-relative app root (scoped marker root)
+    required: false
+    default: "."
+  repo-root:
+    description: Repo checkout root (for .github/ YAML lane)
     required: false
     default: "."
   pyproject-path:
-    description: Path to pyproject.toml relative to working-directory
+    description: pyproject.toml path relative to working-directory
     required: false
     default: "pyproject.toml"
+  package-json-path:
+    description: package.json path relative to working-directory
+    required: false
+    default: "package.json"
+  alembic-root:
+    description: Alembic script root relative to working-directory
+    required: false
+    default: "alembic"
+  terraform-working-directory:
+    description: Primary Terraform root relative to working-directory
+    required: false
+    default: "terraform"
+  extra-terraform-module-paths:
+    description: Comma-separated extra Terraform roots (relative to working-directory)
+    required: false
+    default: ""
+  raft-app-manifest:
+    description: Raft App YAML relative to working-directory
+    required: false
+    default: ".raft/app.yaml"
+  raft-service:
+    description: raft service name (required with git-repo + SSH secret to unlock raft lane)
+    required: false
+    default: ""
+  raft-git-repo:
+    description: Git remote URL for raft apply
+    required: false
+    default: ""
+  has-vps-ssh-key:
+    description: "true when caller mapped a non-empty VPS_SSH_KEY secret"
+    required: false
+    default: "false"
+  workload-identity-provider:
+    description: Non-empty unlocks terraform plan/apply (with service-account)
+    required: false
+    default: ""
+  service-account:
+    description: GCP SA email for terraform plan/apply
+    required: false
+    default: ""
   disable-python:
-    description: If true, never select the Python lane
+    required: false
+    default: "false"
+  disable-node:
+    required: false
+    default: "false"
+  disable-github-yaml:
+    required: false
+    default: "false"
+  disable-rebase-guard:
+    required: false
+    default: "false"
+  disable-terraform:
+    required: false
+    default: "false"
+  disable-terraform-apply:
+    required: false
+    default: "false"
+  disable-raft:
+    required: false
+    default: "false"
+  allow-empty:
+    required: false
+    default: "false"
+  event-name:
+    description: github.event_name
+    required: true
+  python-versions:
+    required: false
+    default: '["3.11","3.12","3.13"]'
+  python-versions-push:
+    required: false
+    default: ""
+  node-versions:
+    description: JSON matrix; empty → infer from .nvmrc / engines / default
+    required: false
+    default: ""
+  node-versions-push:
+    required: false
+    default: ""
+  sync-args:
+    description: uv sync args; empty → infer from pyproject groups
+    required: false
+    default: ""
+  sync-args-push:
+    required: false
+    default: ""
+  pytest-command:
+    required: false
+    default: "pytest -q"
+  skip-python-push:
+    required: false
+    default: "false"
+  skip-node-push:
     required: false
     default: "false"
 
 outputs:
-  run_python:
-    description: Whether to run the Python/uv pytest lane
-    value: ${{ steps.detect.outputs.run_python }}
   working_directory:
     description: Normalized working-directory
     value: ${{ steps.detect.outputs.working_directory }}
+  run_python:
+    value: ${{ steps.detect.outputs.run_python }}
+  run_node:
+    value: ${{ steps.detect.outputs.run_node }}
+  run_github_yaml:
+    value: ${{ steps.detect.outputs.run_github_yaml }}
+  run_rebase_guard:
+    value: ${{ steps.detect.outputs.run_rebase_guard }}
+  run_terraform_validate:
+    value: ${{ steps.detect.outputs.run_terraform_validate }}
+  run_terraform_apply:
+    value: ${{ steps.detect.outputs.run_terraform_apply }}
+  run_raft:
+    value: ${{ steps.detect.outputs.run_raft }}
+  terraform_working_directory:
+    value: ${{ steps.detect.outputs.terraform_working_directory }}
+  alembic_root:
+    value: ${{ steps.detect.outputs.alembic_root }}
+  raft_service:
+    value: ${{ steps.detect.outputs.raft_service }}
+  raft_git_repo:
+    value: ${{ steps.detect.outputs.raft_git_repo }}
+  python_versions:
+    value: ${{ steps.detect.outputs.python_versions }}
+  node_versions:
+    value: ${{ steps.detect.outputs.node_versions }}
+  sync_args:
+    value: ${{ steps.detect.outputs.sync_args }}
+  pytest_command:
+    value: ${{ steps.detect.outputs.pytest_command }}
 
 runs:
   using: composite
@@ -36,21 +163,37 @@ runs:
       shell: bash
       env:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        REPO_ROOT: ${{ inputs.repo-root }}
         PYPROJECT_PATH: ${{ inputs.pyproject-path }}
+        PACKAGE_JSON_PATH: ${{ inputs.package-json-path }}
+        ALEMBIC_ROOT: ${{ inputs.alembic-root }}
+        TERRAFORM_WORKING_DIRECTORY: ${{ inputs.terraform-working-directory }}
+        EXTRA_TERRAFORM_MODULE_PATHS: ${{ inputs.extra-terraform-module-paths }}
+        RAFT_APP_MANIFEST: ${{ inputs.raft-app-manifest }}
+        RAFT_SERVICE: ${{ inputs.raft-service }}
+        RAFT_GIT_REPO: ${{ inputs.raft-git-repo }}
+        HAS_VPS_SSH_KEY: ${{ inputs.has-vps-ssh-key }}
+        WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        SERVICE_ACCOUNT: ${{ inputs.service-account }}
         DISABLE_PYTHON: ${{ inputs.disable-python }}
+        DISABLE_NODE: ${{ inputs.disable-node }}
+        DISABLE_GITHUB_YAML: ${{ inputs.disable-github-yaml }}
+        DISABLE_REBASE_GUARD: ${{ inputs.disable-rebase-guard }}
+        DISABLE_TERRAFORM: ${{ inputs.disable-terraform }}
+        DISABLE_TERRAFORM_APPLY: ${{ inputs.disable-terraform-apply }}
+        DISABLE_RAFT: ${{ inputs.disable-raft }}
+        ALLOW_EMPTY: ${{ inputs.allow-empty }}
+        EVENT_NAME: ${{ inputs.event-name }}
+        PYTHON_VERSIONS: ${{ inputs.python-versions }}
+        PYTHON_VERSIONS_PUSH: ${{ inputs.python-versions-push }}
+        NODE_VERSIONS: ${{ inputs.node-versions }}
+        NODE_VERSIONS_PUSH: ${{ inputs.node-versions-push }}
+        SYNC_ARGS: ${{ inputs.sync-args }}
+        SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
+        PYTEST_COMMAND: ${{ inputs.pytest-command }}
+        SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push }}
+        SKIP_NODE_PUSH: ${{ inputs.skip-node-push }}
       run: |
         set -euo pipefail
-        root="${WORKING_DIRECTORY:-.}"
-        root="${root#./}"
-        [[ -z "${root}" ]] && root="."
-        pyproject="${root%/}/${PYPROJECT_PATH}"
-        pyproject="${pyproject#./}"
-
-        run_python=false
-        if [[ "${DISABLE_PYTHON}" != "true" && -f "${pyproject}" ]]; then
-          run_python=true
-        fi
-
-        echo "working_directory=${root}" >> "$GITHUB_OUTPUT"
-        echo "run_python=${run_python}" >> "$GITHUB_OUTPUT"
-        echo "detect: root=${root} pyproject=${pyproject} run_python=${run_python}"
+        # Bundled next to action.yml (keep in sync with scripts/ci/detect_layout.sh).
+        bash "${GITHUB_ACTION_PATH}/detect_layout.sh"

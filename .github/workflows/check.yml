@@ -19,14 +19,16 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  id-token: write # umbrella may unlock terraform plan/apply via WIF
 
 jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
-    # Event knobs (optional): shared defaults + *-push / skip-*-push.
-    # Defaults keep the full matrix on both pull_request and push.
-    # Timeouts (optional): detect-/python-/node-/ci-timeout-minutes.
+    with:
+      # Same commit as the reusable workflow under test (detect-layout + script).
+      standards-ref: ${{ github.sha }}
+    # Optional: disable-* / working-directory / WIF / raft unlocks — see HOW-TO-USE.
 
   semver:
     name: Semver

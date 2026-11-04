@@ -1,20 +1,13 @@
-# Public CI building block — short pin:
+# Public CI umbrella — short pin:
 #   uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
 #
-# workflow_call only. This repo dogfoods via check.yml (name: CI).
-# Consumers copy templates/workflows/ci.yml (thin orchestrator).
+# workflow_call only. Dogfood via check.yml (name: CI).
+# Detect chooses lanes from layout under working-directory; disable-* / empty
+# credentials skip lanes. Direct lane workflows remain callable alone.
 #
-# Note: GitHub forbids subdirectories under .github/workflows/ for reusable
-# workflows. Organize with short flat names (ci, python, node, semver-ci, semver-cd).
-# Composite actions MAY live under .github/actions/<name>/ (see detect-layout).
-#
-# Shared inputs run on both pre-merge (pull_request) and post-merge
-# (push / workflow_dispatch). Optional *-push / skip-*-push override only on
-# post-merge when set. For string *-push inputs: omitted and explicit "" both
-# inherit the shared default (-n check) — "" does NOT mean "clear the matrix".
-# To skip a lane on push, use skip-*-push (or disable-* for every event).
-# Do not pass '[]' as a "run nothing" signal; that is a non-empty override.
-# Consumers should NOT inject event_name expressions themselves.
+# Shared inputs run on both pre-merge and post-merge. Optional *-push /
+# skip-*-push override only on post-merge. Consumers should NOT inject
+# event_name expressions themselves.
 
 name: ci
 
@@ -22,9 +15,15 @@ on:
   workflow_call:
     inputs:
       working-directory:
-        description: Repo-relative app root (monorepo package dir)
+        description: Repo-relative app root (scoped marker root)
         type: string
         default: "."
+      standards-ref:
+        description: >-
+          Ref of danielnachumdev/actions for detect-layout (default latest).
+          Dogfood should pass github.sha.
+        type: string
+        default: latest
       pyproject-path:
         description: pyproject.toml path relative to working-directory
         type: string
@@ -33,81 +32,162 @@ on:
         description: package.json path relative to working-directory
         type: string
         default: "package.json"
+      alembic-root:
+        description: Alembic script root relative to working-directory
+        type: string
+        default: "alembic"
+      rebase-base-ref:
+        description: Git ref for rebase-guard (e.g. origin/main)
+        type: string
+        default: "origin/main"
+      terraform-working-directory:
+        description: Primary Terraform root relative to working-directory
+        type: string
+        default: "terraform"
+      extra-terraform-module-paths:
+        description: Comma-separated extra Terraform roots
+        type: string
+        default: ""
+      terraform-version:
+        description: Terraform CLI version
+        type: string
+        default: "1.9.8"
+      workload_identity_provider:
+        description: >-
+          Full WIF provider resource name. Non-empty (with service_account)
+          unlocks terraform plan/apply when a Terraform layout is detected.
+        type: string
+        default: ""
+      service_account:
+        description: GCP SA email for terraform plan/apply
+        type: string
+        default: ""
+      skip-apply-push:
+        description: Plan-only on push for terraform apply lane
+        type: boolean
+        default: false
+      skip-fmt:
+        description: Skip terraform fmt -check
+        type: boolean
+        default: false
+      raft-app-manifest:
+        description: Raft App YAML relative to working-directory
+        type: string
+        default: ".raft/app.yaml"
+      raft-service:
+        description: raft service name (with raft-git-repo + VPS_SSH_KEY unlocks raft)
+        type: string
+        default: ""
+      raft-git-repo:
+        description: Git remote URL for raft apply
+        type: string
+        default: ""
+      raft-host:
+        description: VPS host override (else vars.VPS_HOST)
+        type: string
+        default: ""
+      raft-ssh-user:
+        description: SSH user override (else vars.VPS_USER / raft)
+        type: string
+        default: ""
       python-versions:
         description: JSON array of Python versions (shared; both events)
         type: string
         default: '["3.11","3.12","3.13"]'
       python-versions-push:
-        description: >-
-          Optional post-merge override of python-versions. Omitted or "" inherits
-          shared (not a clear). Use skip-python-push to skip the lane.
+        description: Optional post-merge override of python-versions
         type: string
         default: ""
       node-versions:
-        description: JSON array of Node versions (shared; both events)
-        type: string
-        default: '["20","22"]'
-      node-versions-push:
         description: >-
-          Optional post-merge override of node-versions. Omitted or "" inherits
-          shared (not a clear). Use skip-node-push to skip the lane.
+          JSON array of Node versions. Empty (default) infers from .nvmrc /
+          package.json engines, else ["20","22"].
+        type: string
+        default: ""
+      node-versions-push:
+        description: Optional post-merge override of node-versions
         type: string
         default: ""
       sync-args:
-        description: Extra args to uv sync (shared; both events)
-        type: string
-        default: "--group dev"
-      sync-args-push:
         description: >-
-          Optional post-merge override of sync-args. Omitted or "" inherits shared
-          (not a clear).
+          Extra args to uv sync. Empty (default) infers from pyproject
+          dependency groups.
+        type: string
+        default: ""
+      sync-args-push:
+        description: Optional post-merge override of sync-args
         type: string
         default: ""
       pytest-command:
-        description: >-
-          Full pytest invocation under `uv run` in working-directory (same for PR
-          and push; include flags in the command). Default `pytest -q`.
+        description: Full pytest invocation under uv run (default pytest -q)
         type: string
         default: "pytest -q"
       disable-python:
-        description: If true, never run the Python lane (any event)
         type: boolean
         default: false
       disable-node:
-        description: If true, never run the Node lane (any event)
+        type: boolean
+        default: false
+      disable-github-yaml:
+        type: boolean
+        default: false
+      disable-rebase-guard:
+        type: boolean
+        default: false
+      disable-terraform:
+        type: boolean
+        default: false
+      disable-terraform-apply:
+        type: boolean
+        default: false
+      disable-raft:
         type: boolean
         default: false
       skip-python-push:
-        description: Skip Python lane on push/workflow_dispatch only
         type: boolean
         default: false
       skip-node-push:
-        description: Skip Node lane on push/workflow_dispatch only
         type: boolean
         default: false
       allow-empty:
-        description: If true, succeed when no lane is selected
+        description: If true, succeed when no CI lane is selected
         type: boolean
         default: false
       detect-timeout-minutes:
-        description: Job timeout for Detect (minutes)
         type: number
         default: 5
       python-timeout-minutes:
-        description: Job timeout passed to python.yml per matrix cell (minutes)
         type: number
         default: 30
       node-timeout-minutes:
-        description: Job timeout passed to node.yml per matrix cell (minutes)
         type: number
         default: 30
+      github-yaml-timeout-minutes:
+        type: number
+        default: 10
+      rebase-guard-timeout-minutes:
+        type: number
+        default: 10
+      terraform-validate-timeout-minutes:
+        type: number
+        default: 15
+      terraform-timeout-minutes:
+        type: number
+        default: 30
+      raft-timeout-minutes:
+        type: number
+        default: 15
       ci-timeout-minutes:
-        description: Job timeout for the CI gate job (minutes)
         type: number
         default: 5
+    secrets:
+      VPS_SSH_KEY:
+        description: SSH private key for raft (optional; unlocks raft when layout matches)
+        required: false
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   detect:
@@ -117,104 +197,67 @@ jobs:
     outputs:
       run_python: ${{ steps.layout.outputs.run_python }}
       run_node: ${{ steps.layout.outputs.run_node }}
+      run_github_yaml: ${{ steps.layout.outputs.run_github_yaml }}
+      run_rebase_guard: ${{ steps.layout.outputs.run_rebase_guard }}
+      run_terraform_validate: ${{ steps.layout.outputs.run_terraform_validate }}
+      run_terraform_apply: ${{ steps.layout.outputs.run_terraform_apply }}
+      run_raft: ${{ steps.layout.outputs.run_raft }}
       working_directory: ${{ steps.layout.outputs.working_directory }}
+      terraform_working_directory: ${{ steps.layout.outputs.terraform_working_directory }}
+      alembic_root: ${{ steps.layout.outputs.alembic_root }}
+      raft_service: ${{ steps.layout.outputs.raft_service }}
+      raft_git_repo: ${{ steps.layout.outputs.raft_git_repo }}
       python_versions: ${{ steps.layout.outputs.python_versions }}
       node_versions: ${{ steps.layout.outputs.node_versions }}
       sync_args: ${{ steps.layout.outputs.sync_args }}
       pytest_command: ${{ steps.layout.outputs.pytest_command }}
     steps:
       - uses: actions/checkout@v7
-      # Inline detect (not ./.github/actions/…): relative action paths resolve to the
-      # *caller* repo when this workflow is used via workflow_call.
+
+      - name: Checkout standards (detect-layout)
+        uses: actions/checkout@v7
+        with:
+          repository: danielnachumdev/actions
+          ref: ${{ inputs.standards-ref }}
+          path: .actions-standards
+          persist-credentials: false
+
+      # Relative path resolves in the *caller* workspace after standards checkout.
       - name: Detect layout + resolve event knobs
         id: layout
-        env:
-          WORKING_DIRECTORY: ${{ inputs.working-directory || '.' }}
-          PYPROJECT_PATH: ${{ inputs.pyproject-path || 'pyproject.toml' }}
-          PACKAGE_JSON_PATH: ${{ inputs.package-json-path || 'package.json' }}
-          DISABLE_PYTHON: ${{ inputs.disable-python == true && 'true' || 'false' }}
-          DISABLE_NODE: ${{ inputs.disable-node == true && 'true' || 'false' }}
-          EVENT_NAME: ${{ github.event_name }}
-          PYTHON_VERSIONS: ${{ inputs.python-versions || '["3.11","3.12","3.13"]' }}
-          PYTHON_VERSIONS_PUSH: ${{ inputs.python-versions-push }}
-          NODE_VERSIONS: ${{ inputs.node-versions || '["20","22"]' }}
-          NODE_VERSIONS_PUSH: ${{ inputs.node-versions-push }}
-          SYNC_ARGS: ${{ inputs.sync-args || '--group dev' }}
-          SYNC_ARGS_PUSH: ${{ inputs.sync-args-push }}
-          PYTEST_COMMAND: ${{ inputs.pytest-command || 'pytest -q' }}
-          SKIP_PYTHON_PUSH: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
-          SKIP_NODE_PUSH: ${{ inputs.skip-node-push == true && 'true' || 'false' }}
-        run: |
-          set -euo pipefail
-          root="${WORKING_DIRECTORY:-.}"
-          root="${root#./}"
-          [[ -z "${root}" ]] && root="."
-          pyproject="${root%/}/${PYPROJECT_PATH}"
-          pyproject="${pyproject#./}"
-          package_json="${root%/}/${PACKAGE_JSON_PATH}"
-          package_json="${package_json#./}"
-
-          # Shared defaults on both events; non-empty *-push only on post-merge.
-          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
-            event_kind=pr
-          else
-            event_kind=push
-          fi
-
-          pick() {
-            # pick <shared> <push_override>
-            # Empty push override (omitted or "") → shared. Non-empty → override.
-            # There is no "explicit empty clears the value" mode.
-            local shared="$1" push="$2"
-            if [[ "${event_kind}" == "push" && -n "${push}" ]]; then
-              echo "${push}"
-            else
-              echo "${shared}"
-            fi
-          }
-
-          python_versions="$(pick "${PYTHON_VERSIONS}" "${PYTHON_VERSIONS_PUSH}")"
-          node_versions="$(pick "${NODE_VERSIONS}" "${NODE_VERSIONS_PUSH}")"
-          sync_args="$(pick "${SYNC_ARGS}" "${SYNC_ARGS_PUSH}")"
-          pytest_command="${PYTEST_COMMAND}"
-
-          if [[ "${event_kind}" == "push" ]]; then
-            skip_python="${SKIP_PYTHON_PUSH}"
-            skip_node="${SKIP_NODE_PUSH}"
-          else
-            skip_python=false
-            skip_node=false
-          fi
-
-          run_python=false
-          if [[ "${DISABLE_PYTHON}" != "true" && "${skip_python}" != "true" && -f "${pyproject}" ]]; then
-            run_python=true
-          fi
-          run_node=false
-          if [[ "${DISABLE_NODE}" != "true" && "${skip_node}" != "true" && -f "${package_json}" ]]; then
-            run_node=true
-          fi
-
-          {
-            echo "working_directory=${root}"
-            echo "run_python=${run_python}"
-            echo "run_node=${run_node}"
-            echo "python_versions=${python_versions}"
-            echo "node_versions=${node_versions}"
-            # Delimiter form so args may contain spaces / equals.
-            echo "sync_args<<EOF_SYNC"
-            echo "${sync_args}"
-            echo "EOF_SYNC"
-            echo "pytest_command<<EOF_PYTEST_CMD"
-            echo "${pytest_command}"
-            echo "EOF_PYTEST_CMD"
-          } >> "$GITHUB_OUTPUT"
-
-          echo "detect: event=${EVENT_NAME} kind=${event_kind} root=${root}"
-          echo "detect: pyproject=${pyproject} package_json=${package_json}"
-          echo "detect: run_python=${run_python} run_node=${run_node} skip_python=${skip_python} skip_node=${skip_node}"
-          echo "detect: python_versions=${python_versions} node_versions=${node_versions}"
-          echo "detect: sync_args=${sync_args} pytest_command=${pytest_command}"
+        uses: ./.actions-standards/.github/actions/detect-layout
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          repo-root: "."
+          pyproject-path: ${{ inputs.pyproject-path }}
+          package-json-path: ${{ inputs.package-json-path }}
+          alembic-root: ${{ inputs.alembic-root }}
+          terraform-working-directory: ${{ inputs.terraform-working-directory }}
+          extra-terraform-module-paths: ${{ inputs.extra-terraform-module-paths }}
+          raft-app-manifest: ${{ inputs.raft-app-manifest }}
+          raft-service: ${{ inputs.raft-service }}
+          raft-git-repo: ${{ inputs.raft-git-repo }}
+          has-vps-ssh-key: ${{ secrets.VPS_SSH_KEY != '' && 'true' || 'false' }}
+          workload-identity-provider: ${{ inputs.workload_identity_provider }}
+          service-account: ${{ inputs.service_account }}
+          disable-python: ${{ inputs.disable-python == true && 'true' || 'false' }}
+          disable-node: ${{ inputs.disable-node == true && 'true' || 'false' }}
+          disable-github-yaml: ${{ inputs.disable-github-yaml == true && 'true' || 'false' }}
+          disable-rebase-guard: ${{ inputs.disable-rebase-guard == true && 'true' || 'false' }}
+          disable-terraform: ${{ inputs.disable-terraform == true && 'true' || 'false' }}
+          disable-terraform-apply: ${{ inputs.disable-terraform-apply == true && 'true' || 'false' }}
+          disable-raft: ${{ inputs.disable-raft == true && 'true' || 'false' }}
+          allow-empty: ${{ inputs.allow-empty == true && 'true' || 'false' }}
+          event-name: ${{ github.event_name }}
+          python-versions: ${{ inputs.python-versions }}
+          python-versions-push: ${{ inputs.python-versions-push }}
+          node-versions: ${{ inputs.node-versions }}
+          node-versions-push: ${{ inputs.node-versions-push }}
+          sync-args: ${{ inputs.sync-args }}
+          sync-args-push: ${{ inputs.sync-args-push }}
+          pytest-command: ${{ inputs.pytest-command }}
+          skip-python-push: ${{ inputs.skip-python-push == true && 'true' || 'false' }}
+          skip-node-push: ${{ inputs.skip-node-push == true && 'true' || 'false' }}
 
   python:
     name: Python
@@ -238,12 +281,79 @@ jobs:
       node-versions: ${{ needs.detect.outputs.node_versions }}
       timeout-minutes: ${{ inputs.node-timeout-minutes }}
 
+  github-yaml:
+    name: GitHub YAML
+    needs: [detect]
+    if: needs.detect.outputs.run_github_yaml == 'true'
+    uses: ./.github/workflows/github-yaml.yml
+    with:
+      timeout-minutes: ${{ inputs.github-yaml-timeout-minutes }}
+
+  rebase-guard:
+    name: Rebase guard
+    needs: [detect]
+    if: needs.detect.outputs.run_rebase_guard == 'true'
+    uses: ./.github/workflows/rebase-guard.yml
+    with:
+      alembic-root: ${{ needs.detect.outputs.alembic_root }}
+      base-ref: ${{ inputs.rebase-base-ref }}
+      timeout-minutes: ${{ inputs.rebase-guard-timeout-minutes }}
+
+  terraform-validate:
+    name: Terraform validate
+    needs: [detect]
+    if: needs.detect.outputs.run_terraform_validate == 'true'
+    uses: ./.github/workflows/terraform-validate.yml
+    with:
+      working-directory: ${{ needs.detect.outputs.terraform_working_directory }}
+      extra-module-paths: ${{ inputs.extra-terraform-module-paths }}
+      terraform-version: ${{ inputs.terraform-version }}
+      skip-fmt: ${{ inputs.skip-fmt }}
+      timeout-minutes: ${{ inputs.terraform-validate-timeout-minutes }}
+
+  terraform:
+    name: Terraform
+    needs: [detect]
+    if: needs.detect.outputs.run_terraform_apply == 'true'
+    uses: ./.github/workflows/terraform.yml
+    with:
+      workload_identity_provider: ${{ inputs.workload_identity_provider }}
+      service_account: ${{ inputs.service_account }}
+      working-directory: ${{ needs.detect.outputs.terraform_working_directory }}
+      terraform-version: ${{ inputs.terraform-version }}
+      skip-apply-push: ${{ inputs.skip-apply-push }}
+      skip-fmt: ${{ inputs.skip-fmt }}
+      timeout-minutes: ${{ inputs.terraform-timeout-minutes }}
+
+  raft:
+    name: Raft
+    needs: [detect]
+    if: needs.detect.outputs.run_raft == 'true'
+    uses: ./.github/workflows/raft-deploy.yml
+    with:
+      service: ${{ needs.detect.outputs.raft_service }}
+      git-repo: ${{ needs.detect.outputs.raft_git_repo }}
+      ref: ${{ github.sha }}
+      host: ${{ inputs.raft-host }}
+      ssh-user: ${{ inputs.raft-ssh-user }}
+      timeout-minutes: ${{ inputs.raft-timeout-minutes }}
+    secrets:
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
   # Leaf name "CI" → consumer job named CI reports check "CI / CI".
-  # !cancelled(): skip gate when concurrency cancels an in-flight run (avoids a
-  # false FAILURE that blocks merge while the surviving run is green).
   ci:
     name: CI
-    needs: [detect, python, node]
+    needs:
+      [
+        detect,
+        python,
+        node,
+        github-yaml,
+        rebase-guard,
+        terraform-validate,
+        terraform,
+        raft,
+      ]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.ci-timeout-minutes }}
@@ -254,19 +364,40 @@ jobs:
           PYTHON_RESULT: ${{ needs.python.result }}
           RUN_NODE: ${{ needs.detect.outputs.run_node }}
           NODE_RESULT: ${{ needs.node.result }}
+          RUN_GITHUB_YAML: ${{ needs.detect.outputs.run_github_yaml }}
+          GITHUB_YAML_RESULT: ${{ needs.github-yaml.result }}
+          RUN_REBASE: ${{ needs.detect.outputs.run_rebase_guard }}
+          REBASE_RESULT: ${{ needs.rebase-guard.result }}
+          RUN_TF_VALIDATE: ${{ needs.detect.outputs.run_terraform_validate }}
+          TF_VALIDATE_RESULT: ${{ needs.terraform-validate.result }}
+          RUN_TF_APPLY: ${{ needs.detect.outputs.run_terraform_apply }}
+          TF_APPLY_RESULT: ${{ needs.terraform.result }}
+          RUN_RAFT: ${{ needs.detect.outputs.run_raft }}
+          RAFT_RESULT: ${{ needs.raft.result }}
+          DETECT_RESULT: ${{ needs.detect.result }}
           ALLOW_EMPTY: ${{ inputs.allow-empty == true && 'true' || 'false' }}
         run: |
           set -euo pipefail
-          echo "run_python=${RUN_PYTHON} python_result=${PYTHON_RESULT} run_node=${RUN_NODE} node_result=${NODE_RESULT} allow_empty=${ALLOW_EMPTY}"
+          if [[ "${DETECT_RESULT}" != "success" ]]; then
+            echo "FAIL: Detect did not succeed (result=${DETECT_RESULT})"
+            exit 1
+          fi
           ok=false
-          if [[ "${RUN_PYTHON}" == "true" ]]; then
-            [[ "${PYTHON_RESULT}" == "success" ]]
-            ok=true
-          fi
-          if [[ "${RUN_NODE}" == "true" ]]; then
-            [[ "${NODE_RESULT}" == "success" ]]
-            ok=true
-          fi
+          check_lane() {
+            local name="$1" run="$2" result="$3"
+            if [[ "${run}" == "true" ]]; then
+              echo "lane ${name}: result=${result}"
+              [[ "${result}" == "success" ]]
+              ok=true
+            fi
+          }
+          check_lane python "${RUN_PYTHON}" "${PYTHON_RESULT}"
+          check_lane node "${RUN_NODE}" "${NODE_RESULT}"
+          check_lane github-yaml "${RUN_GITHUB_YAML}" "${GITHUB_YAML_RESULT}"
+          check_lane rebase-guard "${RUN_REBASE}" "${REBASE_RESULT}"
+          check_lane terraform-validate "${RUN_TF_VALIDATE}" "${TF_VALIDATE_RESULT}"
+          check_lane terraform "${RUN_TF_APPLY}" "${TF_APPLY_RESULT}"
+          check_lane raft "${RUN_RAFT}" "${RAFT_RESULT}"
           if [[ "${ok}" == "true" ]]; then
             exit 0
           fi
@@ -274,5 +405,5 @@ jobs:
             echo "OK empty (no lanes)"
             exit 0
           fi
-          echo "FAIL: no CI lane selected (set allow-empty: true or add pyproject.toml / package.json)"
+          echo "FAIL: no CI lane selected"
           exit 1
