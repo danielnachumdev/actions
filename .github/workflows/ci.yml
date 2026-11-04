@@ -185,9 +185,13 @@ on:
         description: SSH private key for raft (optional; unlocks raft when layout matches)
         required: false
 
+# Do not put id-token: write here — it forces every consumer (including
+# allow-empty markdown repos) to grant OIDC at the caller or the reusable
+# workflow fails at startup. Terraform plan/apply requests id-token on that
+# job only; thin orchestrators that unlock WIF must set id-token: write
+# themselves (see templates/workflows/ci.yml + HOW-TO-USE).
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   detect:
@@ -315,6 +319,9 @@ jobs:
     name: Terraform
     needs: [detect]
     if: needs.detect.outputs.run_terraform_apply == 'true'
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/terraform.yml
     with:
       workload_identity_provider: ${{ inputs.workload_identity_provider }}
