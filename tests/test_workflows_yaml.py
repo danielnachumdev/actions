@@ -498,6 +498,7 @@ class TestTerraformWorkflow:
         by_name = {
             s["name"]: s for s in steps if isinstance(s, dict) and "name" in s
         }
+        assert "Require WIF inputs" in by_name
         assert "Authenticate to Google Cloud" in by_name
         assert by_name["Authenticate to Google Cloud"]["uses"].startswith(
             "google-github-actions/auth@"
