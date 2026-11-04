@@ -61,9 +61,18 @@ jobs:
       standards-ref: latest
       # timeout-minutes: 5
 
+  # Opt-in: Agent Skills validation (repo-root */SKILL.md). Not auto-detected.
+  # Prefer requiring check "Validate skills / Validate skills".
+  # validate-skills:
+  #   name: Validate skills
+  #   uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest
+  #   # with:
+  #   #   working-directory: .
+
   # Opt-in: merge Dependabot PRs after sibling CI jobs pass (default off).
   # Must needs: every PR job that must pass first so this runs last in the
-  # workflow graph (with Semver: needs: [ci, semver]; without: needs: [ci]).
+  # workflow graph (with Semver: needs: [ci, semver]; without: needs: [ci];
+  # with skills validate: needs: [ci, validate-skills]).
   # Custom orchestrators with an aggregate success job: needs: that aggregate.
   # If that aggregate uses if: always() while path-filtered siblings may be
   # skipped, gate with always() && needs.<id>.result == 'success' && dependabot

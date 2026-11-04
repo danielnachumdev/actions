@@ -14,7 +14,7 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 | Python | `>=3.11` (CI matrix **3.11, 3.12, 3.13** via reusable `ci.yml` defaults) |
 | Tests | `tests/` — pytest; **never delete** |
 | Workflows | **Flat** under `.github/workflows/` (no subdirs — GitHub rule) |
-| Building blocks | `ci.yml` (umbrella Detect), `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml` |
+| Building blocks | `ci.yml` (umbrella Detect), `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `validate-skills.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml` |
 | Detect | `scripts/ci/detect_layout.sh` (+ bundled copy under `.github/actions/detect-layout/`); umbrella checks out standards at `standards-ref` |
 | Dogfood | Thin `check.yml` (`name: CI`) + `cd.yml` call `./.github/workflows/…`; dogfood passes `standards-ref: ${{ github.sha }}` |
 | Pinning (consumers) | Prefer **`@latest`** (CD opts into `retags: '["latest"]'`); immutable `@vN.N.N` to freeze |
@@ -39,13 +39,16 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 │       ├── semver-cd.yml        # CD: bump → wheel → Release → optional retag → optional PyPI
 │       ├── retag.yml            # force-move explicit floating tags
 │       ├── dependabot-auto-merge.yml
+│       ├── validate-skills.yml  # opt-in skills-ref + Cursor allowlist
 │       ├── cloudrun-deploy.yml  # WIF → gcloud builds triggers run + stream logs
 │       ├── raft-deploy.yml      # SSH + raft apply / doctor on a VPS
 │       ├── check.yml            # dogfood thin CI (name: CI)
 │       └── cd.yml               # dogfood thin CD
 ├── scripts/ci/detect_layout.sh  # Detect source of truth (keep action copy in sync)
+├── scripts/validate_skills.sh   # Agent Skills validator launcher (pinned skills-ref)
+├── scripts/validate_skills.py
 ├── scripts/release/             # release_semver.py, build_python_uv_wheel.sh
-├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun/raft/terraform + CODEOWNERS / Dependabot (@latest)
+├── templates/                   # consumer copy-paste CI/CD/retag/cloudrun/raft/terraform/skills + CODEOWNERS / Dependabot (@latest)
 ├── examples/
 ├── tests/
 ├── pyproject.toml               # test harness (danielnachumdev-actions-tests); not on PyPI

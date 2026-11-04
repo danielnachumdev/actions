@@ -1,0 +1,16 @@
+# Optional: add this job to your thin CI orchestrator when the repo hosts
+# repo-root Agent Skills (`*/SKILL.md`). Prefer requiring check
+# "Validate skills / Validate skills".
+#
+#   validate-skills:
+#     name: Validate skills
+#     uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest
+#     # with:
+#     #   working-directory: .
+#     #   timeout-minutes: 15
+#
+# Wire Dependabot auto-merge needs: to include validate-skills when both run:
+#   needs: [ci, validate-skills]
+#
+# This file is documentation only — copy the job into templates/workflows/ci.yml
+# (or your consumer ci.yml). There is no standalone workflow to enable.

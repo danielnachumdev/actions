@@ -685,3 +685,41 @@ class TestDependabotAutoMergeWorkflow:
         assert "github.event.pull_request.head.sha" in reusable
         assert "ephemeral merge" in reusable
         assert "pull_request.head.sha" in howto
+
+
+class TestValidateSkillsWorkflow:
+    def test_is_reusable_workflow_call(self):
+        data = _load("validate-skills.yml")
+        assert "workflow_call" in _on(data)
+        inputs = _on(data)["workflow_call"]["inputs"]
+        assert inputs["working-directory"]["default"] == "."
+        assert inputs["standards-ref"]["default"] == ""
+        assert inputs["python-version"]["default"] == "3.13"
+        _assert_timeout_input(inputs, "timeout-minutes")
+        job = data["jobs"]["validate"]
+        assert job["name"] == "Validate skills"
+        _assert_job_timeout_wired(job, "timeout-minutes")
+        step_names = [s.get("name", "") for s in job["steps"] if isinstance(s, dict)]
+        assert "Checkout caller" in step_names
+        assert "Checkout standards (validate scripts)" in step_names
+        assert "Validate skills" in step_names
+        text = (_WORKFLOWS / "validate-skills.yml").read_text(encoding="utf-8")
+        assert "github.job_workflow_sha" in text
+        assert "scripts/validate_skills.sh" in text
+        assert (_ROOT / "scripts" / "validate_skills.sh").is_file()
+        assert (_ROOT / "scripts" / "validate_skills.py").is_file()
+
+    def test_template_ci_documents_opt_in(self):
+        text = (_TEMPLATES / "ci.yml").read_text(encoding="utf-8")
+        assert "validate-skills.yml@latest" in text
+        assert "Validate skills / Validate skills" in text
+        assert "needs: [ci, validate-skills]" in text
+        data = _load("ci.yml", templates=True)
+        assert "validate-skills" not in data["jobs"]
+
+    def test_howto_documents_opt_in(self):
+        howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
+        assert "validate-skills.yml" in howto
+        assert "Agent Skills validation" in howto
+        assert "Validate skills / Validate skills" in howto
+        assert "disable-model-invocation" in howto
