@@ -693,7 +693,7 @@ class TestValidateSkillsWorkflow:
         assert "workflow_call" in _on(data)
         inputs = _on(data)["workflow_call"]["inputs"]
         assert inputs["working-directory"]["default"] == "."
-        assert inputs["standards-ref"]["default"] == ""
+        assert inputs["standards-ref"]["default"] == "latest"
         assert inputs["python-version"]["default"] == "3.13"
         _assert_timeout_input(inputs, "timeout-minutes")
         job = data["jobs"]["validate"]
@@ -704,8 +704,8 @@ class TestValidateSkillsWorkflow:
         assert "Checkout standards (validate scripts)" in step_names
         assert "Validate skills" in step_names
         text = (_WORKFLOWS / "validate-skills.yml").read_text(encoding="utf-8")
-        assert "github.job_workflow_sha" in text
         assert "scripts/validate_skills.sh" in text
+        assert "inputs.standards-ref" in text
         assert (_ROOT / "scripts" / "validate_skills.sh").is_file()
         assert (_ROOT / "scripts" / "validate_skills.py").is_file()
 
