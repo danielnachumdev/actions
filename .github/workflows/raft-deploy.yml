@@ -19,15 +19,18 @@ on:
       service:
         description: raft App / compose service name
         type: string
-        required: true
+        required: false
+        default: ""
       git-repo:
         description: Git remote URL used by raft (e.g. git@github.com:org/repo.git)
         type: string
-        required: true
+        required: false
+        default: ""
       ref:
         description: Deploy ref (commit SHA, tag, or branch tip raft can resolve)
         type: string
-        required: true
+        required: false
+        default: ""
       host:
         description: >-
           VPS hostname or IP. Empty (default) resolves vars.VPS_HOST from the
@@ -59,7 +62,7 @@ on:
     secrets:
       VPS_SSH_KEY:
         description: SSH private key for the VPS (caller maps secrets.VPS_SSH_KEY)
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -75,11 +78,18 @@ jobs:
         env:
           INPUT_HOST: ${{ inputs.host }}
           INPUT_USER: ${{ inputs.ssh-user }}
+          INPUT_SERVICE: ${{ inputs.service }}
+          INPUT_GIT_REPO: ${{ inputs.git-repo }}
+          INPUT_REF: ${{ inputs.ref }}
           VAR_HOST: ${{ vars.VPS_HOST }}
           VAR_USER: ${{ vars.VPS_USER }}
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${INPUT_SERVICE}" ] || [ -z "${INPUT_GIT_REPO}" ] || [ -z "${INPUT_REF}" ]; then
+            echo "::error::service, git-repo, and ref are required to run raft-deploy.yml"
+            exit 1
+          fi
           if [ -z "${SSH_KEY}" ]; then
             echo "::error::Missing secrets.VPS_SSH_KEY (map it on the workflow_call secrets: block)."
             exit 1

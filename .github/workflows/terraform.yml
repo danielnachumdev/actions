@@ -25,11 +25,13 @@ on:
       workload_identity_provider:
         description: Full resource name of the WIF provider
         type: string
-        required: true
+        required: false
+        default: ""
       service_account:
         description: GCP service account email to impersonate
         type: string
-        required: true
+        required: false
+        default: ""
       working-directory:
         description: Directory containing the Terraform root module
         type: string
@@ -95,6 +97,17 @@ jobs:
     env:
       TF_IN_AUTOMATION: "true"
     steps:
+      - name: Require WIF inputs
+        env:
+          WIF: ${{ inputs.workload_identity_provider }}
+          SA: ${{ inputs.service_account }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${WIF}" || -z "${SA}" ]]; then
+            echo "::error::workload_identity_provider and service_account are required to run terraform.yml"
+            exit 1
+          fi
+
       - name: Checkout
         if: inputs.ref == ''
         uses: actions/checkout@v7

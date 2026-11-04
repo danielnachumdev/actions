@@ -19,6 +19,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  id-token: write # umbrella may unlock terraform plan/apply via WIF
 
 jobs:
   ci:

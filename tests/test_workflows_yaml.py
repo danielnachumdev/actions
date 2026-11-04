@@ -388,13 +388,16 @@ class TestRaftDeployWorkflow:
         call = _on(data)["workflow_call"]
         inputs = call["inputs"]
         for key in ("service", "git-repo", "ref"):
-            assert inputs[key]["required"] is True, key
+            # Optional at schema level so umbrella can skip the job without
+            # startup_failure; runtime still requires non-empty values.
+            assert inputs[key]["required"] is False, key
+            assert inputs[key]["default"] == ""
         assert inputs["host"]["default"] == ""
         assert inputs["ssh-user"]["default"] == ""
         assert inputs["command_timeout"]["default"] == "10m"
         assert inputs["skip-doctor"]["default"] is False
         _assert_timeout_input(inputs, "timeout-minutes")
-        assert call["secrets"]["VPS_SSH_KEY"]["required"] is True
+        assert call["secrets"]["VPS_SSH_KEY"]["required"] is False
         assert set(inputs) == {
             "service",
             "git-repo",
@@ -453,7 +456,9 @@ class TestTerraformWorkflow:
         assert "workflow_call" in _on(data)
         inputs = _on(data)["workflow_call"]["inputs"]
         for key in ("workload_identity_provider", "service_account"):
-            assert inputs[key]["required"] is True, key
+            # Optional so umbrella skipped jobs do not startup_failure; runtime checks.
+            assert inputs[key]["required"] is False, key
+            assert inputs[key]["default"] == ""
         assert inputs["working-directory"]["default"] == "terraform"
         assert inputs["terraform-version"]["default"] == "1.9.8"
         assert inputs["ref"]["default"] == ""
