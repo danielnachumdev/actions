@@ -48,11 +48,18 @@ Inferred when inputs are left empty: `sync-args` from pyproject dependency group
 2. Copy [`templates/github/`](templates/github/) CODEOWNERS + dependabot  
 3. Labels: always create `dependencies` (and any you use). Create `noBump` / `bumpPatch` / `bumpMinor` / `bumpMajor` **only if** adopting Semver.  
    - Dependabot’s `labels:` in `dependabot.yml` (template includes **`dependencies`** + **`noBump`**) only apply if those labels **already exist**. With Semver, without `noBump`, Semver CI fails on Dependabot PRs — drop the `noBump` label entry from `dependabot.yml` when Semver is not used.  
-4. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
-5. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
-6. Pin `@latest`  
-7. PyPI publishers only (Semver CD): **token** → `publish-pypi: true` + `PYPI_API_TOKEN`; **Trusted Publishing** → inline a `pypi` job in thin `cd.yml` (not via the reusable job)   
-8. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
+4. **CI concurrency:** thin `ci.yml` must use `cancel-in-progress: true` with
+   `group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}`
+   (see [`templates/workflows/ci.yml`](templates/workflows/ci.yml)). Keep `pull_request`
+   `opened` + `synchronize` (and usually `reopened`); do **not** stack a new run per
+   push while an older one is still queued — cancel the superseded run. CD / deploy
+   workflows that must not be interrupted (e.g. in-flight apply) should keep
+   `cancel-in-progress: false`.
+5. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
+6. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
+7. Pin `@latest`  
+8. PyPI publishers only (Semver CD): **token** → `publish-pypi: true` + `PYPI_API_TOKEN`; **Trusted Publishing** → inline a `pypi` job in thin `cd.yml` (not via the reusable job)   
+9. Floating tags (Semver CD): pass `retags: '["latest"]'` on thin CD (template does); omit / `""` / `[]` = no retag. Optional standalone: copy [`templates/workflows/retag.yml`](templates/workflows/retag.yml)
 
 ```yaml
 uses: danielnachumdev/actions/.github/workflows/ci.yml@latest
