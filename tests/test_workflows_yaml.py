@@ -122,6 +122,18 @@ class TestCiWorkflow:
             "${{ secrets.VPS_SSH_KEY }}"
         )
 
+    def test_top_level_permissions_omit_id_token(self):
+        """allow-empty callers must not be forced to grant OIDC at startup."""
+        data = _load("ci.yml")
+        perms = data["permissions"]
+        assert perms.get("contents") == "read"
+        assert "id-token" not in perms
+        tf = data["jobs"]["terraform"]
+        assert tf["permissions"]["id-token"] == "write"
+        assert tf["permissions"]["contents"] == "read"
+        howto = (_ROOT / "HOW-TO-USE.md").read_text(encoding="utf-8")
+        assert "does **not** set top-level `id-token: write`" in howto
+
     def test_detect_checks_out_standards_ref(self):
         data = _load("ci.yml")
         steps = data["jobs"]["detect"]["steps"]

@@ -118,7 +118,7 @@ Or call plan/apply alone via [`templates/workflows/terraform.yml`](templates/wor
 | `workflow_dispatch` | plan, then apply |
 | any + `apply: true` | force apply (including on PR) |
 
-Caller needs `permissions.id-token: write` for apply. WIF pool trust on the **calling** repo (`attribute.repository`), not `job_workflow_ref` to this reusable file.
+Caller needs `permissions.id-token: write` for apply (on the thin orchestrator / calling job). The umbrella reusable `ci.yml` does **not** set top-level `id-token: write` — that would force every consumer (including `allow-empty` markdown/skills repos) to grant OIDC or fail at workflow startup. WIF pool trust on the **calling** repo (`attribute.repository`), not `job_workflow_ref` to this reusable file.
 
 ### Raft VPS apply / redeploy (optional)
 
