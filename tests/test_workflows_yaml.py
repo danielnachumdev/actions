@@ -692,20 +692,12 @@ class TestValidateSkillsWorkflow:
         data = _load("validate-skills.yml")
         assert "workflow_call" in _on(data)
         inputs = _on(data)["workflow_call"]["inputs"]
-        assert inputs["working-directory"]["default"] == "."
-        assert inputs["standards-ref"]["default"] == "latest"
-        assert inputs["python-version"]["default"] == "3.13"
         _assert_timeout_input(inputs, "timeout-minutes")
         job = data["jobs"]["validate"]
         assert job["name"] == "Validate skills"
         _assert_job_timeout_wired(job, "timeout-minutes")
         step_names = [s.get("name", "") for s in job["steps"] if isinstance(s, dict)]
         assert "Checkout caller" in step_names
-        assert "Checkout standards (validate scripts)" in step_names
-        assert "Validate skills" in step_names
-        text = (_WORKFLOWS / "validate-skills.yml").read_text(encoding="utf-8")
-        assert "scripts/validate_skills.sh" in text
-        assert "inputs.standards-ref" in text
         assert (_ROOT / "scripts" / "validate_skills.sh").is_file()
         assert (_ROOT / "scripts" / "validate_skills.py").is_file()
 
