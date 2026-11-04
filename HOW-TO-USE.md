@@ -4,7 +4,7 @@ Adopt `danielnachumdev/actions` in a consumer repo (CI + optional semver CD + hy
 
 ## Folders
 
-GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`.
+GitHub: reusable workflows are **flat** under `.github/workflows/`. Names: `ci.yml`, `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `validate-skills.yml`, `cloudrun-deploy.yml`, `raft-deploy.yml`.
 
 This repo itself dogfoods them via thin `check.yml` (`name: CI`) + `cd.yml` calling `./…` — same shape as the templates below (templates use cross-repo `@latest` pins).
 
@@ -21,7 +21,7 @@ Thin consumers usually need **no `with:`**. Detect scopes markers to `working-di
 | `versions.tf` under `terraform/` (or `extra-terraform-module-paths`) | `terraform-validate.yml` always; `terraform.yml` plan/apply only if `workload_identity_provider` + `service_account` are non-empty | validate: no; apply: WIF |
 | `.raft/` + app manifest | `raft-deploy.yml` when `raft-service`, `raft-git-repo`, and `secrets.VPS_SSH_KEY` are set | yes |
 
-**Not auto-wired:** `cloudrun-deploy.yml`, `semver-*`, `dependabot-auto-merge.yml` — call them from the thin orchestrator when you want them.
+**Not auto-wired:** `cloudrun-deploy.yml`, `semver-*`, `dependabot-auto-merge.yml`, `validate-skills.yml` — call them from the thin orchestrator when you want them.
 
 Inferred when inputs are left empty: `sync-args` from pyproject dependency groups; `node-versions` from `.nvmrc` / `engines.node` (else `["20","22"]`). Explicit values always win. Use `disable-*` / `allow-empty` / `*-push` to override.
 
@@ -63,6 +63,8 @@ uses: danielnachumdev/actions/.github/workflows/semver-cd.yml@latest
 uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
 # optional Dependabot merge after CI (from thin CI — see below):
 uses: danielnachumdev/actions/.github/workflows/dependabot-auto-merge.yml@latest
+# optional Agent Skills validation (repo-root */SKILL.md — see below):
+uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest
 # optional raft VPS apply/redeploy (from thin CD — see below):
 uses: danielnachumdev/actions/.github/workflows/raft-deploy.yml@latest
 # optional Cloud Build / Cloud Run deploy (from thin CD — see below):
@@ -70,6 +72,24 @@ uses: danielnachumdev/actions/.github/workflows/cloudrun-deploy.yml@latest
 # optional Terraform plan / apply (PR plan; post-merge apply — see below):
 uses: danielnachumdev/actions/.github/workflows/terraform.yml@latest
 ```
+
+### Agent Skills validation (optional)
+
+Reusable job for repos that host [Agent Skills](https://agentskills.io) as repo-root `*/SKILL.md` directories (e.g. [danielnachumdev/skills](https://github.com/danielnachumdev/skills)). Runs pinned **skills-ref** after stripping known Cursor-only frontmatter keys (`disable-model-invocation`, `paths`, `icon`, `color`) into a temp copy so Cursor behavior stays in source while the open spec still gates CI.
+
+Not auto-detected — add an explicit job on thin CI:
+
+```yaml
+jobs:
+  validate-skills:
+    name: Validate skills
+    uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest
+    # with:
+    #   working-directory: .
+    #   timeout-minutes: 15
+```
+
+Prefer required check **`Validate skills / Validate skills`**. Locally: `./scripts/validate_skills.sh [SKILLS_ROOT]` from a checkout of this hub (or after copy). When Dependabot auto-merge is also enabled, include the job in `needs:` (e.g. `needs: [ci, validate-skills]`).
 
 ### Terraform (auto + optional direct)
 

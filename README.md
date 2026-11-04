@@ -13,13 +13,13 @@ This repository **defines** the reusable workflows and **consumes** them the sam
 
 - **Smart umbrella `ci.yml`** — Detect → Python / Node / GitHub YAML / Alembic rebase / Terraform validate (+ plan/apply when WIF passed) / raft (when `.raft/` + SSH unlock)
 - **Override or disable** — `disable-*`, `working-directory`, matrices, `*-push`; call lane workflows directly when needed
-- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `raft-deploy.yml`, `cloudrun-deploy.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`
+- **Short workflow names** — `ci.yml`, `python.yml`, `node.yml`, `github-yaml.yml`, `rebase-guard.yml`, `terraform-validate.yml`, `terraform.yml`, `raft-deploy.yml`, `cloudrun-deploy.yml`, `semver-ci.yml`, `semver-cd.yml`, `retag.yml`, `dependabot-auto-merge.yml`, `validate-skills.yml`
 - **Shared CI + optional post-merge knobs** — no consumer `event_name` expressions
 - **Overridable job timeouts** on every reusable job
 - **One semver concept, two stages** — validate labels in CI; bump + Release in CD (opt-in)
 - **Allowed labels** — `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (exactly one)
 - **Opt-in floating tags** — `retags: '["latest"]'` on CD; prefer consumer pins **`@latest`**
-- **Opt-in Dependabot merge** / **PyPI** / **Cloud Run** (direct call; not auto-detected)
+- **Opt-in Dependabot merge** / **PyPI** / **Cloud Run** / **Agent Skills validate** (direct call; not auto-detected)
 - **Templates included** — CODEOWNERS, Dependabot, thin consumer starters
 
 ## Sixty-second start

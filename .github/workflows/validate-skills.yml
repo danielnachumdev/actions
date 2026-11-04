@@ -1,0 +1,87 @@
+# Opt-in Agent Skills validation (skills-ref + Cursor frontmatter allowlist).
+# Call from the thin CI orchestrator when the repo hosts repo-root */SKILL.md dirs.
+#
+#   validate-skills:
+#     name: Validate skills
+#     uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest
+#     # with:
+#     #   working-directory: .
+#     #   standards-ref: ""   # empty → this workflow's commit (job_workflow_sha)
+#
+# Prefer requiring check "Validate skills / Validate skills".
+# Scripts are checked out from danielnachumdev/actions so the called workflow
+# version and validator stay aligned (default standards-ref = job_workflow_sha).
+
+name: validate-skills
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory under the caller checkout that contains skill folders
+        type: string
+        default: "."
+      standards-ref:
+        description: >-
+          Git ref of danielnachumdev/actions for validate scripts. Empty uses
+          github.job_workflow_sha (the commit of this called workflow).
+        type: string
+        default: ""
+      python-version:
+        description: Python version for uv / skills-ref
+        type: string
+        default: "3.13"
+      timeout-minutes:
+        description: Job timeout (minutes)
+        type: number
+        default: 15
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate skills
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Checkout caller
+        uses: actions/checkout@v7
+
+      - name: Resolve standards ref
+        id: standards
+        env:
+          INPUT_REF: ${{ inputs.standards-ref }}
+          WORKFLOW_SHA: ${{ github.job_workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_REF}" ]]; then
+            echo "ref=${INPUT_REF}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "ref=${WORKFLOW_SHA}" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "Using standards-ref=$(tail -n1 "${GITHUB_OUTPUT}" | cut -d= -f2-)"
+
+      - name: Checkout standards (validate scripts)
+        uses: actions/checkout@v7
+        with:
+          repository: danielnachumdev/actions
+          ref: ${{ steps.standards.outputs.ref }}
+          path: .actions-standards
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Validate skills
+        env:
+          SKILLS_ROOT: ${{ github.workspace }}/${{ inputs.working-directory }}
+        run: |
+          set -euo pipefail
+          root="${SKILLS_ROOT}"
+          # Normalize trailing "/." from working-directory default
+          root="${root%/}"
+          root="${root%/.}"
+          exec "${GITHUB_WORKSPACE}/.actions-standards/scripts/validate_skills.sh" "${root}"
