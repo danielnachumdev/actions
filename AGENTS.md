@@ -20,12 +20,14 @@ Pitch / consumer quickstart: [`README.md`](README.md). Adoption checklist: [`HOW
 | Pinning (consumers) | Prefer **`@latest`** (CD opts into `retags: '["latest"]'`); immutable `@vN.N.N` to freeze |
 | Semver labels | Exactly one of: `noBump` \| `bumpPatch` \| `bumpMinor` \| `bumpMajor` |
 | Secrets | Never commit API tokens, `.pypirc`, or credential files. Thin CD may map `PYPI_API_TOKEN` by name (needed for `publish-pypi: true`; empty OK when PyPI-off / OIDC is caller-inlined). |
+| Issue templates | [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/) — feature request + bug report; blank issues allowed |
 
 ```text
 .
 ├── .github/
 │   ├── CODEOWNERS
 │   ├── dependabot.yml
+│   ├── ISSUE_TEMPLATE/          # feature_request + bug_report + config.yml
 │   ├── actions/detect-layout/   # composite + bundled detect_layout.sh
 │   └── workflows/
 │       ├── ci.yml               # umbrella Detect → lanes → aggregate CI
