@@ -56,6 +56,7 @@ Prefer **`@latest`** so consumers track the floating tag CD moves after each rel
 | --- | ---- |
 | [`HOW-TO-USE.md`](HOW-TO-USE.md) | Adopt in a consumer repo (checklist + detection table) |
 | [`AGENTS.md`](AGENTS.md) | Implementation details for maintainers / coding agents |
+| [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/) | Feature request + bug report forms (aligned with [`danielnachumdev/template`](https://github.com/danielnachumdev/template)) |
 | [`templates/`](templates/) | Copy-paste CI/CD / retag / Cloud Run / raft / Terraform + CODEOWNERS / Dependabot starters |
 
 ## Who it’s for
