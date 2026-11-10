@@ -111,7 +111,7 @@ jobs:
           echo "Using SSH ${USER}@${HOST}"
 
       - name: Apply App + redeploy on VPS
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         env:
           SERVICE: ${{ inputs.service }}
           REF: ${{ inputs.ref }}
