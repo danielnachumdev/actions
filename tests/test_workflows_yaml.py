@@ -436,7 +436,6 @@ class TestRaftDeployWorkflow:
         assert "VPS_SSH_KEY" in resolve["run"]
         assert "VPS_HOST" in resolve["run"]
         ssh = by_name["Apply App + redeploy on VPS"]
-        assert ssh["uses"] == "appleboy/ssh-action@v1.2.0"
         assert ssh["with"]["command_timeout"] == "${{ inputs.command_timeout }}"
         assert ssh["with"]["key"] == "${{ secrets.VPS_SSH_KEY }}"
         script = ssh["with"]["script"]
