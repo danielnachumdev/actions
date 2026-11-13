@@ -1,10 +1,14 @@
 name: CI
 
-# Thin orchestrator. Prefer requiring check "CI / CI".
+# Thin orchestrator. Soft-protect main with the check name THIS workflow reports
+# on a green PR (umbrella `uses: …/ci.yml` → usually "CI / CI"). Custom
+# multi-lane aggregates that call python/node/… directly usually report "CI".
+# See HOW-TO-USE.md → Required check names — do not copy a name blindly.
 # Umbrella auto-detects lanes from layout (pyproject, package.json, .github/,
 # alembic, terraform/, .raft/). Override or disable-* only when needed.
-# Add Semver (job below + "Semver / Semver" required check) ONLY if this repo
-# publishes versions (releases/tags/wheels). Apps/sites/infra: omit semver.
+# Add Semver (job below) ONLY if this repo publishes versions
+# (releases/tags/wheels); then require whatever name that job reports
+# (usually "Semver / Semver"). Apps/sites/infra: omit semver.
 #
 # Prefer @latest (CD moves floating latest after each release).
 
@@ -62,7 +66,8 @@ jobs:
       # timeout-minutes: 5
 
   # Opt-in: Agent Skills validation (repo-root */SKILL.md). Not auto-detected.
-  # Prefer requiring check "Validate skills / Validate skills".
+  # Soft-protect with the check name this job reports (usually
+  # "Validate skills / Validate skills"). Confirm on a green PR.
   # validate-skills:
   #   name: Validate skills
   #   uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest

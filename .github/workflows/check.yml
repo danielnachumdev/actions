@@ -2,7 +2,9 @@ name: CI
 
 # Dogfood orchestrator — same shape as templates/workflows/ci.yml, but pins
 # relative `./` so this repository consumes its own building blocks.
-# Required checks: "CI / CI" and "Semver / Semver".
+# This dogfood orchestrator uses reusable workflow_call jobs, so green PRs
+# report "CI / CI" and "Semver / Semver" — require those names here.
+# Other shapes report different names; see HOW-TO-USE.md → Required check names.
 
 on:
   push:
