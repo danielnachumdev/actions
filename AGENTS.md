@@ -132,7 +132,7 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 ```
 
-Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
+Soft-protect with the check names a green PR in **that** consumer actually reports (this hub’s thin umbrella shape → usually **`CI / CI`** + **`Semver / Semver`** when Semver is adopted). Custom multi-lane aggregates often report plain **`CI`**. See HOW-TO-USE.md → Required check names — never copy a name without confirming.
 
 Include PR types `labeled` / `unlabeled` on the consumer CI workflow so label edits re-run `semver-ci`.
 
@@ -243,7 +243,7 @@ On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.ym
 
 1. Branch off `main`; open a PR into `main`.
 2. Attach **exactly one** semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
-3. **CI** — dogfood `check.yml` → reusable `ci.yml` + `semver-ci.yml`. Prefer required checks **`CI / CI`** and **`Semver / Semver`**.
+3. **CI** — dogfood `check.yml` → reusable `ci.yml` + `semver-ci.yml`. This repo’s green PRs report **`CI / CI`** and **`Semver / Semver`** (require those here). Consumers: match whatever *their* PR reports — see HOW-TO-USE.md → Required check names.
 4. **CD** — dogfood `cd.yml` → `semver-cd.yml` after CI succeeds on `main`: bump → wheel → GitHub Release → optional `retags` → optional PyPI, or skip on `noBump`.
 5. Version **source of truth** is GitHub Release tags (optional floating `latest` when CD `retags` are enabled).
 6. Dependabot PRs stay on `noBump`.
@@ -252,7 +252,7 @@ On a successful release, when `retags` is non-empty, `semver-cd` calls `retag.ym
 ### Repo gates (already configured)
 
 - `.github/CODEOWNERS` — `@danielnachumdev`
-- Prefer required **`CI / CI`** + **`Semver / Semver`**; code-owner reviews; no force-push to `main`
+- Required checks for **this** dogfood shape: **`CI / CI`** + **`Semver / Semver`**; code-owner reviews; no force-push to `main`
 - Private vulnerability reporting via GitHub Security Advisories when enabled
 
 ---

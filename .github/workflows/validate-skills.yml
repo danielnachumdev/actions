@@ -5,7 +5,8 @@
 #     name: Validate skills
 #     uses: danielnachumdev/actions/.github/workflows/validate-skills.yml@latest
 #
-# Prefer requiring check "Validate skills / Validate skills".
+# Soft-protect with the check name this job reports (usually
+# "Validate skills / Validate skills"). Confirm on a green PR.
 
 name: validate-skills
 

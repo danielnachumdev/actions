@@ -3,7 +3,8 @@
 1. Copy [`templates/workflows/ci.yml`](../../templates/workflows/ci.yml) and [`cd.yml`](../../templates/workflows/cd.yml)  
 2. Copy [`templates/github/`](../../templates/github/) (CODEOWNERS + **dependabot.yml**)  
 3. Create labels **before** Dependabot runs: `noBump`, `bumpPatch`, `bumpMinor`, `bumpMajor`, `dependencies`  
-4. Required checks: **`CI / CI`**, **`Semver / Semver`**  
+4. Soft-protect with the check names a green PR reports (this thin umbrella shape → usually **`CI / CI`**, **`Semver / Semver`**). Confirm before setting branch protection — see HOW-TO-USE.md → Required check names.  
+
 5. Pin `@latest` (CD opts into `retags: '["latest"]'`). Use an immutable `@vN.N.N` to freeze.
 
 Dependabot’s `labels:` (template: `dependencies` + `noBump` for **pip**, **npm**, and **github-actions**) only stick if those labels already exist. Without `noBump`, Semver CI fails on Dependabot PRs. Include the `npm` block only when the repo has a `package.json` (adjust `directory:` for monorepos, e.g. `/services/frontend`).

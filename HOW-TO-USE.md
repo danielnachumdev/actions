@@ -55,7 +55,8 @@ Inferred when inputs are left empty: `sync-args` from pyproject dependency group
    push while an older one is still queued — cancel the superseded run. CD / deploy
    workflows that must not be interrupted (e.g. in-flight apply) should keep
    `cancel-in-progress: false`.
-5. Protect `main` (soft): require **`CI / CI`** (+ **`Semver / Semver`** **only if** Semver is adopted); CODEOWNERS `@you`; required review; admin bypass OK  
+5. Protect `main` (soft): require the **actual** aggregate check name(s) this repo’s CI reports on a green PR (see **Required check names** below — do **not** copy a literal string from this doc without checking); CODEOWNERS `@you`; required review; admin bypass OK  
+
 6. Enable Security settings (see below) — Dependabot opens PRs; optionally merge Dependabot PRs after CI (below)  
 7. Pin `@latest`  
 8. PyPI publishers only (Semver CD): **token** → `publish-pypi: true` + `PYPI_API_TOKEN`; **Trusted Publishing** → inline a `pypi` job in thin `cd.yml` (not via the reusable job)   
@@ -96,7 +97,22 @@ jobs:
     #   timeout-minutes: 15
 ```
 
-Prefer required check **`Validate skills / Validate skills`**. Locally: `./scripts/validate_skills.sh [SKILLS_ROOT]` from a checkout of this hub (or after copy). When Dependabot auto-merge is also enabled, include the job in `needs:` (e.g. `needs: [ci, validate-skills]`).
+When adopting skills validation, soft-protect with the check name that job actually reports (usually **`Validate skills / Validate skills`** for the thin template). Confirm on a green PR. Locally: `./scripts/validate_skills.sh [SKILLS_ROOT]` from a checkout of this hub (or after copy). When Dependabot auto-merge is also enabled, include the job in `needs:` (e.g. `needs: [ci, validate-skills]`).
+
+### Required check names
+
+Branch protection / rulesets match the **check run `name`** GitHub records — not a phrase copied from this guide.
+
+GitHub names reusable (`workflow_call`) jobs as `{caller workflow name} / {called job name}`. A normal job in the caller is just `{job name}`.
+
+| Orchestrator shape | What a green PR usually reports | Soft-protect with |
+| ------------------ | ------------------------------- | ----------------- |
+| Thin template: workflow `name: CI` + `jobs.ci` with `uses: …/ci.yml@…` and `name: CI` | `CI / CI` | **`CI / CI`** |
+| Same + Semver job (`name: Semver`, `uses: …/semver-ci.yml`) | `Semver / Semver` | **`Semver / Semver`** only if Semver is adopted |
+| Skills validate job as in the template | `Validate skills / Validate skills` | that exact reported name |
+| Custom thin CI that calls lanes directly (`python.yml` / `node.yml` / …) and has a **local** aggregate job `name: CI` (monorepos, multi-`working-directory`) | `CI` (not `CI / CI`) | **`CI`** |
+
+**How to pick:** open any green PR → Checks → copy the aggregate job name that must pass. Requiring a name that never appears (classic footgun: **`CI / CI`** on a custom aggregate that only reports **`CI`**) leaves merges permanently blocked while every real job is green.
 
 ### Terraform (auto + optional direct)
 
@@ -407,7 +423,8 @@ Also:
 2. PRs that edit `.github/workflows/**` cannot be merged with `GITHUB_TOKEN` (no `workflows` scope). DAM **skips** those merges with a notice (job stays green); merge them manually.
 3. If classic branch protection has `require_code_owner_reviews: true` with review count `0`, set code-owner reviews to **false** so Dependabot can land after required CI checks (keep required status checks).
 4. If branch protection requires checks that are **not** sibling jobs in this workflow, either add them to `needs:` or they can still block the merge.
-5. Do **not** require **`Semver / Semver`** on repos that omitted Semver.
+5. Do **not** require **`Semver / Semver`** (or any Semver check) on repos that omitted Semver.
+6. Do **not** require **`CI / CI`** unless a green PR in *this* repo actually reports that name (see **Required check names**).
 
 Default remains **off** (job commented out in the template).
 

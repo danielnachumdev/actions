@@ -1,6 +1,6 @@
 # Optional: add this job to your thin CI orchestrator when the repo hosts
-# repo-root Agent Skills (`*/SKILL.md`). Prefer requiring check
-# "Validate skills / Validate skills".
+# repo-root Agent Skills (`*/SKILL.md`). Soft-protect with the check name
+# this job reports on a green PR (usually "Validate skills / Validate skills").
 #
 #   validate-skills:
 #     name: Validate skills
